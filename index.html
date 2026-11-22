@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GBA Launcher — Browser GBA &amp; NDS Emulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(113, 113, 122, 0.35); border-radius: 9999px; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 antialiased">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // ========================================================================
+    // CRISP INLINE SVG ICONS (ZERO EXTERNAL ICON BUNDLE ISSUES)
+    // ========================================================================
+    function Icon({ name, className = "w-4 h-4" }) {
+      const paths = {
+        gamepad: (
+          <>
+            <line x1="6" y1="12" x2="10" y2="12" />
+            <line x1="8" y1="10" x2="8" y2="14" />
+            <line x1="15" y1="13" x2="15.01" y2="13" />
+            <line x1="18" y1="11" x2="18.01" y2="11" />
+            <rect x="2" y="6" width="20" height="12" rx="4" />
+          </>
+        ),
+        plus: (
+          <>
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </>
+        ),
+        search: (
+          <>
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </>
+        ),
+        settings: (
+          <>
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </>
+        ),
+        users: (
+          <>
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </>
+        ),
+        trophy: (
+          <>
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+            <path d="M4 22h16" />
+            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+          </>
+        ),
+        message: (
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        ),
+        maximize: (
+          <>
+            <polyline points="15 3 21 3 21 9" />
+            <polyline points="9 21 3 21 3 15" />
+            <line x1="21" y1="3" x2="14" y2="10" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+          </>
+        ),
+        minimize: (
+          <>
+            <polyline points="4 14 10 14 10 20" />
+            <polyline points="20 10 14 10 14 4" />
+            <line x1="14" y1="10" x2="21" y2="3" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+          </>
+        ),
+        x: (
+          <>
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </>
+        ),
+        play: <polygon points="6 3 20 12 6 21 6 3" />,
+        sliders: (
+          <>
+            <line x1="4" y1="21" x2="4" y2="14" />
+            <line x1="4" y1="10" x2="4" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12" y2="3" />
+            <line x1="20" y1="21" x2="20" y2="16" />
+            <line x1="20" y1="12" x2="20" y2="3" />
+            <line x1="1" y1="14" x2="7" y2="14" />
+            <line x1="9" y1="8" x2="15" y2="8" />
+            <line x1="17" y1="16" x2="23" y2="16" />
+          </>
+        ),
+        moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />,
+        sun: (
+          <>
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </>
+        ),
+        layout: (
+          <>
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <line x1="3" y1="9" x2="21" y2="9" />
+          </>
+        ),
+        sidebar: (
+          <>
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+          </>
+        ),
+        keyboard: (
+          <>
+            <rect x="2" y="4" width="20" height="16" rx="2" ry="2" />
+            <line x1="6" y1="8" x2="6.01" y2="8" />
+            <line x1="10" y1="8" x2="10.01" y2="8" />
+            <line x1="14" y1="8" x2="14.01" y2="8" />
+            <line x1="18" y1="8" x2="18.01" y2="8" />
+            <line x1="8" y1="12" x2="8.01" y2="12" />
+            <line x1="12" y1="12" x2="12.01" y2="12" />
+            <line x1="16" y1="12" x2="16.01" y2="12" />
+            <line x1="7" y1="16" x2="17" y2="16" />
+          </>
+        ),
+        logout: (
+          <>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </>
+        ),
+        upload: (
+          <>
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </>
+        ),
+        trash: (
+          <>
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </>
+        ),
+        send: (
+          <>
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </>
+        ),
+        cpu: (
+          <>
+            <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+            <rect x="9" y="9" width="6" height="6" />
+            <line x1="9" y1="1" x2="9" y2="4" />
+            <line x1="15" y1="1" x2="15" y2="4" />
+            <line x1="9" y1="20" x2="9" y2="23" />
+            <line x1="15" y1="20" x2="15" y2="23" />
+            <line x1="20" y1="9" x2="23" y2="9" />
+            <line x1="20" y1="14" x2="23" y2="14" />
+            <line x1="1" y1="9" x2="4" y2="9" />
+            <line x1="1" y1="14" x2="4" y2="14" />
+          </>
+        ),
+        refresh: (
+          <>
+            <polyline points="23 4 23 10 17 10" />
+            <polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </>
+        )
+      };
+
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          {paths[name] || null}
+        </svg>
+      );
+    }
+
+    // ========================================================================
+    // INDEXEDDB PERSISTENT ROM & BIOS STORAGE
+    // ========================================================================
+    const DB_NAME = 'GBALauncher_WASM_DB';
+    const DB_VERSION = 1;
+    const STORE_ROMS = 'roms';
+    const STORE_BIOS = 'bios';
+
+    function openLauncherDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_ROMS)) {
+            db.createObjectStore(STORE_ROMS, { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains(STORE_BIOS)) {
+            db.createObjectStore(STORE_BIOS, { keyPath: 'key' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbSaveRom(romRecord) {
+      const db = await openLauncherDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_ROMS, 'readwrite');
+        tx.objectStore(STORE_ROMS).put(romRecord);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function dbGetAllRoms() {
+      const db = await openLauncherDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_ROMS, 'readonly');
+        const req = tx.objectStore(STORE_ROMS).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbDeleteRom(id) {
+      const db = await openLauncherDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_ROMS, 'readwrite');
+        tx.objectStore(STORE_ROMS).delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function dbSaveBios(key, fileName, buffer) {
+      const db = await openLauncherDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_BIOS, 'readwrite');
+        tx.objectStore(STORE_BIOS).put({ key, fileName, buffer });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function dbGetAllBios() {
+      const db = await openLauncherDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_BIOS, 'readonly');
+        const req = tx.objectStore(STORE_BIOS).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    // ========================================================================
+    // BUILT-IN COPYRIGHT-FREE ARM7TDMI HOMEBREW TEST CARTRIDGE (.GBA)
+    // ========================================================================
+    function buildOriginalGbaHomebrewBuffer() {
+      const rom = new Uint8Array(512);
+      const view = new DataView(rom.buffer);
+
+      // ARM branch over header to 0x080000C0: B #0xC0
+      view.setUint32(0x00, 0xea00002e, true);
+
+      const title = 'PULSE DEMO  ';
+      for (let i = 0; i < 12; i++) rom[0xa0 + i] = title.charCodeAt(i);
+      const code = 'APLJ01';
+      for (let i = 0; i < 6; i++) rom[0xac + i] = code.charCodeAt(i);
+      rom[0xb2] = 0x96;
+
+      let chk = 0;
+      for (let i = 0xa0; i <= 0xbc; i++) chk = (chk - rom[i]) & 0xff;
+      rom[0xbd] = (chk - 0x19) & 0xff;
+
+      // ARM7TDMI Mode 3 (240x160 15-bit framebuffer) interactive shader loop at 0xC0
+      const instructions = [
+        0xe3a00301, // mov r0, #0x04000000
+        0xe3a01b01, // mov r1, #0x0400
+        0xe3811003, // orr r1, r1, #0x03
+        0xe1c010b0, // strh r1, [r0]
+        0xe3a02406, // mov r2, #0x06000000
+        0xe3a05000, // mov r5, #0
+        0xe1d061b0, // ldrh r6, [r0, #0x130]
+        0xe1e06006, // mvn r6, r6
+        0xe2855001, // add r5, r5, #1
+        0xe0855006, // add r5, r5, r6
+        0xe1a03002, // mov r3, r2
+        0xe3a04c96, // mov r4, #38400
+        0xe0847005, // add r7, r4, r5
+        0xe02772a4, // eor r7, r7, r4, lsr #5
+        0xe0c370b2, // strh r7, [r3], #2
+        0xe2544001, // subs r4, r4, #1
+        0x1afffffa, // bne pixel_loop
+        0xeafffff2  // b frame_loop
+      ];
+
+      instructions.forEach((op, idx) => {
+        view.setUint32(0xc0 + idx * 4, op, true);
+      });
+
+      return rom.buffer;
+    }
+
+    // ========================================================================
+    // ROM BINARY HEADER INSPECTOR & ARTWORK GENERATOR
+    // ========================================================================
+    const COVER_PALETTES = [
+      ['#4f46e5', '#06b6d4'],
+      ['#059669', '#34d399'],
+      ['#e11d48', '#fb7185'],
+      ['#d97706', '#fbbf24'],
+      ['#7c3aed', '#c084fc'],
+      ['#0284c7', '#38bdf8']
+    ];
+
+    function hashString(str) {
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return Math.abs(h);
+    }
+
+    function readAscii(bytes, start, length) {
+      let out = '';
+      for (let i = start; i < start + length && i < bytes.length; i++) {
+        const c = bytes[i];
+        if (c === 0) break;
+        if (c >= 32 && c <= 126) out += String.fromCharCode(c);
+      }
+      return out.trim();
+    }
+
+    function inspectRomFile(fileName, arrayBuffer) {
+      const bytes = new Uint8Array(arrayBuffer);
+      const lower = fileName.toLowerCase();
+
+      let system = 'GBA';
+      if (lower.endsWith('.nds')) {
+        system = 'NDS';
+      } else if (lower.endsWith('.gba')) {
+        system = 'GBA';
+      } else if (bytes.length > 0xc0 && bytes[0xb2] === 0x96) {
+        system = 'GBA';
+      } else if (bytes.length > 0x200) {
+        system = 'NDS';
+      }
+
+      let internalTitle = '';
+      let gameCode = '';
+
+      if (system === 'GBA' && bytes.length >= 0xb4) {
+        internalTitle = readAscii(bytes, 0xa0, 12);
+        gameCode = readAscii(bytes, 0xac, 4);
+      } else if (system === 'NDS' && bytes.length >= 0x10) {
+        internalTitle = readAscii(bytes, 0x00, 12);
+        gameCode = readAscii(bytes, 0x0c, 4);
+      }
+
+      const cleanFileTitle = fileName
+        .replace(/\.(gba|nds|zip)$/i, '')
+        .replace(/\[.*?\]|\(.*?\)/g, '')
+        .replace(/[_-]+/g, ' ')
+        .trim();
+
+      const displayTitle = cleanFileTitle || internalTitle || 'Untitled ROM';
+      const palette = COVER_PALETTES[hashString(displayTitle) % COVER_PALETTES.length];
+
+      return {
+        system,
+        defaultLayout: system === 'NDS' ? 'dual-stacked' : 'single',
+        title: displayTitle,
+        internalTitle: internalTitle || displayTitle.toUpperCase().slice(0, 12),
+        gameCode: gameCode || (system === 'NDS' ? 'NTR-001' : 'AGB-001'),
+        palette,
+        sizeBytes: arrayBuffer.byteLength
+      };
+    }
+
+    // ========================================================================
+    // THEMES, KEYBINDS & SOCIAL SEED DATA
+    // ========================================================================
+    const ACCENT_THEMES = {
+      indigo: { name: 'Indigo', hex: '#6366f1', ring: 'ring-indigo-500', bg: 'bg-indigo-600', hover: 'hover:bg-indigo-500', text: 'text-indigo-400', soft: 'bg-indigo-500/15' },
+      emerald: { name: 'Emerald', hex: '#10b981', ring: 'ring-emerald-500', bg: 'bg-emerald-600', hover: 'hover:bg-emerald-500', text: 'text-emerald-400', soft: 'bg-emerald-500/15' },
+      crimson: { name: 'Crimson', hex: '#f43f5e', ring: 'ring-rose-500', bg: 'bg-rose-600', hover: 'hover:bg-rose-500', text: 'text-rose-400', soft: 'bg-rose-500/15' },
+      amber: { name: 'Amber', hex: '#f59e0b', ring: 'ring-amber-500', bg: 'bg-amber-600', hover: 'hover:bg-amber-500', text: 'text-amber-400', soft: 'bg-amber-500/15' },
+      mono: { name: 'Monochrome', hex: '#a1a1aa', ring: 'ring-zinc-400', bg: 'bg-zinc-200 text-zinc-950', hover: 'hover:bg-white', text: 'text-zinc-300', soft: 'bg-zinc-500/20' }
+    };
+
+    const DEFAULT_KEYBINDS = {
+      GBA: {
+        Up: 'ArrowUp',
+        Down: 'ArrowDown',
+        Left: 'ArrowLeft',
+        Right: 'ArrowRight',
+        A: 'KeyX',
+        B: 'KeyZ',
+        L: 'KeyA',
+        R: 'KeyS',
+        Start: 'Enter',
+        Select: 'ShiftRight'
+      },
+      NDS: {
+        Up: 'ArrowUp',
+        Down: 'ArrowDown',
+        Left: 'ArrowLeft',
+        Right: 'ArrowRight',
+        A: 'KeyX',
+        B: 'KeyZ',
+        X: 'KeyD',
+        Y: 'KeyC',
+        L: 'KeyA',
+        R: 'KeyS',
+        Start: 'Enter',
+        Select: 'ShiftRight',
+        Touchscreen: 'Mouse Click / Drag'
+      }
+    };
+
+    const INITIAL_FRIENDS = [
+      { id: 'f1', name: 'Kaito_NDS', status: 'online', system: 'NDS', game: 'Chrono Homebrew DS', hours: 142 },
+      { id: 'f2', name: 'MinaGBA', status: 'online', system: 'GBA', game: 'Apotris v4.0', hours: 98 },
+      { id: 'f3', name: 'SoraDev', status: 'idle', system: 'GBA', game: 'Celeste Classic GBA', hours: 64 },
+      { id: 'f4', name: 'RexRetro', status: 'offline', system: null, game: 'Last seen 2h ago', hours: 215 }
+    ];
+
+    const INITIAL_CHAT = [
+      { id: 'm1', sender: 'Kaito_NDS', system: 'NDS', text: 'Dual screen layout works great for touch puzzle games!', time: '12:41' },
+      { id: 'm2', sender: 'MinaGBA', system: 'GBA', text: 'mGBA core runs at locked 60fps in Chrome.', time: '12:44' }
+    ];
+
+    // ========================================================================
+    // WEBASSEMBLY EMULATORJS RUNTIME STAGE
+    // ========================================================================
+    function EmulatorWasmStage({ rom, romBuffer, biosUrl, coreOverride, accentHex, onEngineStatus }) {
+      const [iframeSrcDoc, setIframeSrcDoc] = useState('');
+      const blobUrlRef = useRef(null);
+
+      useEffect(() => {
+        if (!romBuffer || !rom) return;
+
+        if (blobUrlRef.current) {
+          URL.revokeObjectURL(blobUrlRef.current);
+          blobUrlRef.current = null;
+        }
+
+        const blob = new Blob([romBuffer], { type: 'application/octet-stream' });
+        const blobUrl = URL.createObjectURL(blob);
+        blobUrlRef.current = blobUrl;
+
+        const core = coreOverride || (rom.system === 'NDS' ? 'nds' : 'gba');
+        const safeFileName = rom.fileName && /\.(gba|nds)$/i.test(rom.fileName)
+          ? rom.fileName
+          : `${rom.title.replace(/[^a-z0-9]/gi, '_')}.${rom.system.toLowerCase()}`;
+
+        const escapedGameUrl = JSON.stringify(blobUrl);
+        const escapedGameName = JSON.stringify(safeFileName);
+        const escapedCore = JSON.stringify(core);
+        const escapedColor = JSON.stringify(accentHex || '#6366f1');
+        const escapedBios = JSON.stringify(biosUrl || '');
+
+        const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #game {
+      width: 100%;
+      height: 100%;
+      background: #050507;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <script>
+    window.EJS_player = '#game';
+    window.EJS_core = ${escapedCore};
+    window.EJS_gameUrl = ${escapedGameUrl};
+    window.EJS_gameName = ${escapedGameName};
+    window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+    window.EJS_startOnLoaded = true;
+    window.EJS_color = ${escapedColor};
+    window.EJS_biosUrl = ${escapedBios};
+    window.EJS_defaultOptions = {
+      'save-state-location': 'browser'
+    };
+    window.EJS_onGameStart = function() {
+      window.parent.postMessage({ type: 'EJS_READY' }, '*');
+    };
+    window.addEventListener('error', function(e) {
+      window.parent.postMessage({ type: 'EJS_ERROR', message: e.message || 'Core load error' }, '*');
+    });
+  <\/script>
+  <script src="https://cdn.emulatorjs.org/stable/data/loader.js"
+    onload="window.parent.postMessage({ type: 'EJS_LOADER_OK' }, '*')"
+    onerror="window.parent.postMessage({ type: 'EJS_ERROR', message: 'Failed to reach EmulatorJS CDN' }, '*')">
+  <\/script>
+</body>
+</html>`;
+
+        setIframeSrcDoc(html);
+
+        return () => {
+          if (blobUrlRef.current) {
+            URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = null;
+          }
+        };
+      }, [rom, romBuffer, biosUrl, coreOverride, accentHex]);
+
+      useEffect(() => {
+        const handler = (e) => {
+          if (!e.data || typeof e.data !== 'object') return;
+          if (e.data.type === 'EJS_LOADER_OK') onEngineStatus && onEngineStatus('core-downloading');
+          if (e.data.type === 'EJS_READY') onEngineStatus && onEngineStatus('running');
+          if (e.data.type === 'EJS_ERROR') onEngineStatus && onEngineStatus('error', e.data.message);
+        };
+        window.addEventListener('message', handler);
+        return () => window.removeEventListener('message', handler);
+      }, [onEngineStatus]);
+
+      if (!iframeSrcDoc) return null;
+
+      return (
+        <iframe
+          title={`EmulatorJS-${rom && rom.id}`}
+          srcDoc={iframeSrcDoc}
+          className="w-full h-full border-0 block bg-black"
+          allow="autoplay; fullscreen; gamepad"
+        />
+      );
+    }
+
+    // ========================================================================
+    // MAIN APPLICATION
+    // ========================================================================
+    function App() {
+      const [user, setUser] = useState(null);
+      const [authEmail, setAuthEmail] = useState('');
+      const [authName, setAuthName] = useState('');
+
+      const [darkMode, setDarkMode] = useState(true);
+      const [accentKey, setAccentKey] = useState('indigo');
+      const [navLayout, setNavLayout] = useState('sidebar');
+      const [activeTab, setActiveTab] = useState('library');
+      const [systemFilter, setSystemFilter] = useState('ALL');
+      const [searchQuery, setSearchQuery] = useState('');
+
+      const [roms, setRoms] = useState([]);
+      const [romBuffers, setRomBuffers] = useState({});
+      const [biosStore, setBiosStore] = useState({});
+      const [isDragging, setIsDragging] = useState(false);
+
+      const [gbaCore, setGbaCore] = useState('gba');
+      const [ndsCore, setNdsCore] = useState('nds');
+      const [keybinds, setKeybinds] = useState(DEFAULT_KEYBINDS);
+      const [listeningBind, setListeningBind] = useState(null);
+
+      const [pendingRom, setPendingRom] = useState(null);
+      const [skipControlsPopup, setSkipControlsPopup] = useState(false);
+      const [activeRom, setActiveRom] = useState(null);
+      const [screenLayoutOverride, setScreenLayoutOverride] = useState('auto');
+      const [engineStatus, setEngineStatus] = useState('booting');
+      const [engineError, setEngineError] = useState('');
+      const [isFullscreen, setIsFullscreen] = useState(false);
+      const [sessionSeconds, setSessionSeconds] = useState(0);
+
+      const [socialOpen, setSocialOpen] = useState(true);
+      const [friends] = useState(INITIAL_FRIENDS);
+      const [messages, setMessages] = useState(INITIAL_CHAT);
+      const [chatInput, setChatInput] = useState('');
+
+      const fileInputRef = useRef(null);
+      const playerContainerRef = useRef(null);
+      const accent = ACCENT_THEMES[accentKey] || ACCENT_THEMES.indigo;
+
+      useEffect(() => {
+        let mounted = true;
+        (async () => {
+          try {
+            const savedRoms = await dbGetAllRoms();
+            const savedBios = await dbGetAllBios();
+            if (!mounted) return;
+
+            const buffersMap = {};
+            const metadataList = [];
+
+            const demoBuf = buildOriginalGbaHomebrewBuffer();
+            const demoMeta = inspectRomFile('Pulse_Demo.gba', demoBuf);
+            const demoId = 'builtin-pulse-demo-gba';
+            buffersMap[demoId] = demoBuf;
+            metadataList.push({
+              id: demoId,
+              fileName: 'Pulse_Demo.gba',
+              ...demoMeta,
+              playMinutes: 12,
+              isBuiltIn: true
+            });
+
+            for (const item of savedRoms) {
+              if (item.buffer) {
+                buffersMap[item.id] = item.buffer;
+                const { buffer, ...meta } = item;
+                metadataList.push(meta);
+              }
+            }
+
+            const biosMap = {};
+            for (const b of savedBios) {
+              if (b.buffer) {
+                biosMap[b.key] = {
+                  fileName: b.fileName,
+                  url: URL.createObjectURL(new Blob([b.buffer]))
+                };
+              }
+            }
+
+            setRomBuffers(buffersMap);
+            setRoms(metadataList);
+            setBiosStore(biosMap);
+          } catch (err) {
+            console.error('IndexedDB hydration error:', err);
+          }
+        })();
+        return () => { mounted = false; };
+      }, []);
+
+      useEffect(() => {
+        if (!activeRom) {
+          setSessionSeconds(0);
+          return;
+        }
+        const timer = setInterval(() => {
+          setSessionSeconds((s) => s + 1);
+        }, 1000);
+        return () => clearInterval(timer);
+      }, [activeRom]);
+
+      useEffect(() => {
+        if (!listeningBind) return;
+        const onKeyDown = (e) => {
+          e.preventDefault();
+          if (e.code === 'Escape') {
+            setListeningBind(null);
+            return;
+          }
+          setKeybinds((prev) => ({
+            ...prev,
+            [listeningBind.system]: {
+              ...prev[listeningBind.system],
+              [listeningBind.action]: e.code
+            }
+          }));
+          setListeningBind(null);
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+      }, [listeningBind]);
+
+      useEffect(() => {
+        const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+        document.addEventListener('fullscreenchange', onFsChange);
+        return () => document.removeEventListener('fullscreenchange', onFsChange);
+      }, []);
+
+      const handleImportFiles = async (fileList) => {
+        const files = Array.from(fileList || []);
+        if (!files.length) return;
+
+        for (const file of files) {
+          if (!/\.(gba|nds)$/i.test(file.name)) continue;
+          const buffer = await file.arrayBuffer();
+          const info = inspectRomFile(file.name, buffer);
+          const id = `rom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+          const record = {
+            id,
+            fileName: file.name,
+            ...info,
+            playMinutes: 0,
+            addedAt: Date.now()
+          };
+
+          await dbSaveRom({ ...record, buffer });
+          setRomBuffers((prev) => ({ ...prev, [id]: buffer }));
+          setRoms((prev) => [record, ...prev]);
+        }
+      };
+
+      const handleRemoveRom = async (e, id) => {
+        e.stopPropagation();
+        await dbDeleteRom(id);
+        setRoms((prev) => prev.filter((r) => r.id !== id));
+        setRomBuffers((prev) => {
+          const copy = { ...prev };
+          delete copy[id];
+          return copy;
+        });
+      };
+
+      const handleUploadBios = async (systemKey, file) => {
+        if (!file) return;
+        const buffer = await file.arrayBuffer();
+        await dbSaveBios(systemKey, file.name, buffer);
+        const url = URL.createObjectURL(new Blob([buffer]));
+        setBiosStore((prev) => ({
+          ...prev,
+          [systemKey]: { fileName: file.name, url }
+        }));
+      };
+
+      const requestPlayRom = (rom) => {
+        if (skipControlsPopup) {
+          bootRomNow(rom);
+        } else {
+          setPendingRom(rom);
+        }
+      };
+
+      const bootRomNow = (rom) => {
+        setPendingRom(null);
+        setScreenLayoutOverride('auto');
+        setEngineStatus('booting');
+        setEngineError('');
+        setActiveRom(rom);
+      };
+
+      const closeGameStage = () => {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+        if (activeRom && sessionSeconds > 0) {
+          const addedMins = Math.max(1, Math.round(sessionSeconds / 60));
+          setRoms((prev) =>
+            prev.map((r) =>
+              r.id === activeRom.id ? { ...r, playMinutes: (r.playMinutes || 0) + addedMins } : r
+            )
+          );
+        }
+        setActiveRom(null);
+      };
+
+      const toggleFullscreen = () => {
+        if (!playerContainerRef.current) return;
+        if (!document.fullscreenElement) {
+          playerContainerRef.current.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      };
+
+      const sendChatMessage = (e) => {
+        e.preventDefault();
+        if (!chatInput.trim()) return;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `msg-${Date.now()}`,
+            sender: (user && user.name) || 'PlayerOne',
+            system: (activeRom && activeRom.system) || 'GBA',
+            text: chatInput.trim(),
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+        setChatInput('');
+      };
+
+      const filteredRoms = useMemo(() => {
+        return roms.filter((r) => {
+          const matchesSys = systemFilter === 'ALL' || r.system === systemFilter;
+          const matchesQuery =
+            !searchQuery.trim() ||
+            r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            r.gameCode.toLowerCase().includes(searchQuery.toLowerCase());
+          return matchesSys && matchesQuery;
+        });
+      }, [roms, systemFilter, searchQuery]);
+
+      const leaderboardEntries = useMemo(() => {
+        const userTotalMins = roms.reduce((acc, r) => acc + (r.playMinutes || 0), 0);
+        const list = [
+          ...friends.map((f) => ({
+            id: f.id,
+            name: f.name,
+            system: f.system || 'GBA',
+            hours: f.hours,
+            romsCount: Math.max(3, Math.floor(f.hours / 18)),
+            isYou: false
+          })),
+          {
+            id: 'you',
+            name: (user && user.name) || 'You',
+            system: (activeRom && activeRom.system) || 'NDS',
+            hours: Math.max(1, Math.round(userTotalMins / 60)),
+            romsCount: roms.length,
+            isYou: true
+          }
+        ];
+        return list.sort((a, b) => b.hours - a.hours);
+      }, [friends, roms, user, activeRom]);
+
+      const effectiveLayout = useMemo(() => {
+        if (!activeRom) return 'single';
+        if (screenLayoutOverride !== 'auto') return screenLayoutOverride;
+        return activeRom.system === 'NDS' ? 'dual-stacked' : 'single';
+      }, [activeRom, screenLayoutOverride]);
+
+      const stageAspectStyle = useMemo(() => {
+        if (effectiveLayout === 'dual-stacked') {
+          return { aspectRatio: '2 / 3', maxHeight: 'calc(100vh - 110px)', maxWidth: 'min(92vw, 540px)' };
+        }
+        if (effectiveLayout === 'dual-wide') {
+          return { aspectRatio: '4 / 3', maxHeight: 'calc(100vh - 110px)', maxWidth: 'min(95vw, 1080px)' };
+        }
+        return { aspectRatio: '3 / 2', maxHeight: 'calc(100vh - 110px)', maxWidth: 'min(94vw, 980px)' };
+      }, [effectiveLayout]);
+
+      // ======================================================================
+      // 1. SIGN-IN VIEW
+      // ======================================================================
+      if (!user) {
+        return (
+          <div className={`min-h-screen flex items-center justify-center p-6 transition-colors ${darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}>
+            <div className={`w-full max-w-md rounded-2xl border p-8 shadow-2xl transition-all ${darkMode ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white border-zinc-200'}`}>
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-white shadow-lg ${accent.bg}`}>
+                    <Icon name="gamepad" className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-semibold tracking-tight">GBA Launcher</h1>
+                    <p className="text-xs text-zinc-400">WebAssembly GBA &amp; NDS Runtime</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDarkMode(!darkMode)}
+                  className={`p-2 rounded-lg border ${darkMode ? 'border-zinc-800 hover:bg-zinc-800' : 'border-zinc-200 hover:bg-zinc-100'}`}
+                  title="Toggle theme"
+                >
+                  <Icon name={darkMode ? 'sun' : 'moon'} className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setUser({
+                    name: authName.trim() || (authEmail ? authEmail.split('@')[0] : 'PlayerOne'),
+                    email: authEmail || 'guest@gba-launcher.local'
+                  });
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Display Tag</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. RetroRunner"
+                    value={authName}
+                    onChange={(e) => setAuthName(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none transition ${darkMode ? 'bg-zinc-950 border-zinc-800 focus:border-zinc-600' : 'bg-zinc-50 border-zinc-200 focus:border-zinc-400'}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Email (Optional)</label>
+                  <input
+                    type="email"
+                    placeholder="player@domain.com"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none transition ${darkMode ? 'bg-zinc-950 border-zinc-800 focus:border-zinc-600' : 'bg-zinc-50 border-zinc-200 focus:border-zinc-400'}`}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className={`w-full py-2.5 rounded-xl font-medium text-sm text-white transition shadow-md ${accent.bg} ${accent.hover}`}
+                >
+                  Sign In to Launcher
+                </button>
+              </form>
+
+              <div className="mt-4 pt-4 border-t border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
+                <span>Local IndexedDB ROM Storage</span>
+                <button
+                  type="button"
+                  onClick={() => setUser({ name: 'GuestPlayer', email: 'guest@local' })}
+                  className={`font-medium ${accent.text} hover:underline`}
+                >
+                  Continue as Guest →
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ======================================================================
+      // 2. MAIN LAUNCHER SHELL
+      // ======================================================================
+      return (
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            handleImportFiles(e.dataTransfer.files);
+          }}
+          className={`min-h-screen flex flex-col transition-colors ${darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".gba,.nds"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              handleImportFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
+
+          {isDragging && (
+            <div className="fixed inset-0 z-50 bg-zinc-950/85 backdrop-blur-sm flex items-center justify-center p-6 pointer-events-none">
+              <div className={`border-2 border-dashed rounded-3xl p-12 text-center max-w-md ${accent.ring} border-current`}>
+                <Icon name="upload" className={`w-12 h-12 mb-4 mx-auto ${accent.text}`} />
+                <h2 className="text-lg font-semibold mb-1">Drop .GBA or .NDS ROMs</h2>
+                <p className="text-xs text-zinc-400">
+                  Auto-detects single-screen GBA (3:2) or dual-screen NDS (2:3) and saves to your browser library.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {navLayout === 'topbar' && (
+            <header className={`h-16 border-b px-6 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md ${darkMode ? 'bg-zinc-950/85 border-zinc-800/80' : 'bg-white/85 border-zinc-200'}`}>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white ${accent.bg}`}>
+                    <Icon name="gamepad" className="w-4 h-4" />
+                  </div>
+                  <span className="font-semibold tracking-tight text-sm">GBA Launcher</span>
+                </div>
+                <nav className="flex items-center gap-1">
+                  {[
+                    { id: 'library', label: 'Library', icon: 'gamepad' },
+                    { id: 'leaderboard', label: 'Leaderboard', icon: 'trophy' },
+                    { id: 'settings', label: 'Settings', icon: 'settings' }
+                  ].map((item) => {
+                    const active = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setActiveTab(item.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition ${
+                          active ? `${accent.soft} ${accent.text}` : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        <Icon name={item.icon} className="w-3.5 h-3.5" />
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium text-white flex items-center gap-1.5 ${accent.bg} ${accent.hover}`}
+                >
+                  <Icon name="plus" className="w-3.5 h-3.5" /> Add ROM
+                </button>
+                <button
+                  onClick={() => setSocialOpen(!socialOpen)}
+                  className={`p-2 rounded-lg border text-xs ${darkMode ? 'border-zinc-800 hover:bg-zinc-900' : 'border-zinc-200 hover:bg-zinc-100'}`}
+                  title="Toggle Social Panel"
+                >
+                  <Icon name="users" className="w-4 h-4" />
+                </button>
+              </div>
+            </header>
+          )}
+
+          <div className="flex-1 flex overflow-hidden">
+            {navLayout === 'sidebar' && (
+              <aside className={`w-60 border-r flex flex-col justify-between p-4 shrink-0 ${darkMode ? 'bg-zinc-950 border-zinc-800/80' : 'bg-white border-zinc-200'}`}>
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3 px-2 pt-1">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shadow ${accent.bg}`}>
+                      <Icon name="gamepad" className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm tracking-tight">GBA Launcher</div>
+                      <div className="text-[11px] text-zinc-500">GBA + NDS WASM</div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-medium text-white flex items-center justify-center gap-2 shadow-sm transition ${accent.bg} ${accent.hover}`}
+                  >
+                    <Icon name="plus" className="w-4 h-4" /> Import .GBA / .NDS
+                  </button>
+
+                  <nav className="space-y-1">
+                    {[
+                      { id: 'library', label: 'ROM Library', icon: 'gamepad' },
+                      { id: 'leaderboard', label: 'Leaderboard', icon: 'trophy' },
+                      { id: 'settings', label: 'Customise & Cores', icon: 'sliders' }
+                    ].map((item) => {
+                      const active = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setActiveTab(item.id)}
+                          className={`w-full px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2.5 transition ${
+                            active
+                              ? `${accent.soft} ${accent.text}`
+                              : 'text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200'
+                          }`}
+                        >
+                          <Icon name={item.icon} className="w-4 h-4" />
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </div>
+
+                <div className={`pt-4 border-t space-y-2 ${darkMode ? 'border-zinc-800/80' : 'border-zinc-200'}`}>
+                  <div className="flex items-center justify-between px-2">
+                    <div className="truncate">
+                      <div className="text-xs font-medium truncate">{user.name}</div>
+                      <div className="text-[11px] text-zinc-500 truncate">{roms.length} ROMs ready</div>
+                    </div>
+                    <button
+                      onClick={() => setUser(null)}
+                      className="p-1.5 rounded-lg text-zinc-500 hover:text
