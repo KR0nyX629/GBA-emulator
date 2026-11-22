@@ -39,7 +39,6 @@
       overflow: hidden;
     }
 
-    /* Ambient background glow for frosted glass depth */
     .ambient-glow {
       position: fixed;
       inset: 0;
@@ -50,7 +49,6 @@
         radial-gradient(circle at 82% 85%, var(--accent-soft), transparent 48%);
     }
 
-    /* Snowflakes layer */
     #snow-canvas {
       position: fixed;
       inset: 0;
@@ -297,7 +295,7 @@
       box-shadow: 0 18px 36px rgba(0, 0, 0, 0.38);
     }
     .rom-cover {
-      height: 68%;
+      height: 70%;
       padding: 12px;
       display: flex;
       flex-direction: column;
@@ -312,6 +310,7 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
+      object-position: center top;
       z-index: 1;
       opacity: 0;
       transition: opacity 0.25s ease;
@@ -321,8 +320,11 @@
       position: absolute;
       inset: 0;
       z-index: 2;
-      background: linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.68) 100%);
+      background: linear-gradient(to bottom, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.0) 40%, rgba(0,0,0,0.65) 100%);
       pointer-events: none;
+    }
+    .rom-cover.has-art .rom-cover-scrim {
+      background: linear-gradient(to bottom, rgba(0,0,0,0.38) 0%, transparent 32%, transparent 100%);
     }
     .rom-badges {
       position: relative;
@@ -334,7 +336,7 @@
       font-weight: 700;
     }
     .badge-dark {
-      background: rgba(0, 0, 0, 0.55);
+      background: rgba(0, 0, 0, 0.58);
       padding: 3px 7px;
       border-radius: 6px;
       backdrop-filter: blur(6px);
@@ -353,16 +355,11 @@
       margin-bottom: 6px;
     }
     .rom-meta {
-      padding: 11px 13px;
+      padding: 10px 13px;
       flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-    }
-    .card-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
     .mini-action {
       font-size: 11px;
@@ -589,7 +586,6 @@
 
   <!-- 2. MAIN LAUNCHER SHELL -->
   <div id="launcher-view" class="app-shell hidden">
-    <!-- Top Header (when topbar layout active) -->
     <header id="topbar-nav" class="topbar glass hidden">
       <div style="display:flex;align-items:center;gap:20px;">
         <div class="brand">
@@ -606,7 +602,6 @@
     </header>
 
     <div class="body-row">
-      <!-- Left Sidebar (when sidebar layout active) -->
       <aside id="sidebar-nav" class="sidebar glass">
         <div>
           <div class="brand">
@@ -638,12 +633,10 @@
         </div>
       </aside>
 
-      <!-- Main Content -->
       <main class="main-area">
         <div id="main-content" class="container"></div>
       </main>
 
-      <!-- Friends & Chat Drawer (Zero pre-added bots) -->
       <aside class="social-drawer glass">
         <div class="drawer-sec" style="display:flex;align-items:center;justify-content:space-between;">
           <span style="font-weight:700;font-size:13px;">Friends</span>
@@ -753,7 +746,7 @@
       NDS: { Up: 'ArrowUp', Down: 'ArrowDown', Left: 'ArrowLeft', Right: 'ArrowRight', A: 'KeyX', B: 'KeyZ', X: 'KeyD', Y: 'KeyC', L: 'KeyA', R: 'KeyS', Start: 'Enter', Select: 'ShiftRight', Touch: 'Mouse / Tap' }
     };
 
-    const PREFS_KEY = 'gba_launcher_prefs_v2';
+    const PREFS_KEY = 'gba_launcher_prefs_v3';
 
     function loadSavedPrefs() {
       try {
@@ -952,7 +945,7 @@
     }
 
     // ========================================================================
-    // 4. ROM HEADER PARSER, NDS ICON EXTRACTOR & LIBRETRO BOXART URLS
+    // 4. ROM HEADER PARSER, NDS ICON EXTRACTOR & SMART BOXART RESOLVER
     // ========================================================================
     function readAscii(bytes, start, len) {
       let s = '';
@@ -1012,27 +1005,77 @@
     }
 
     function sanitizeLibretroName(name) {
-      // Libretro thumbnails replace & * / : \ ? " < > | with _
-      return name.replace(/[&*/:\\?"<>|]/g, '_').trim();
+      return name.replace(/[&*/:\\?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
     }
 
-    function buildCoverCandidates(system, fileName, cleanTitle) {
-      const repo = system === 'NDS'
+    function expandTitleVariants(rawName) {
+      let base = rawName
+        .replace(/\.(gba|nds|zip)$/i, '')
+        .replace(/^\d{3,4}\s*-\s*/, '')
+        .replace(/\[.*?\]|\(.*?\)/g, '')
+        .replace(/[_]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const variants = new Set([base]);
+
+      // Expand common abbreviations & No-Intro title conventions
+      const expanded = base
+        .replace(/^gta\b[:\s-]*/i, 'Grand Theft Auto - ')
+        .replace(/^pkmn\b[:\s-]*/i, 'Pokemon - ')
+        .replace(/^pokemon\b(?!\s*-)[:\s]+/i, 'Pokemon - ')
+        .replace(/^zelda\b[:\s-]*/i, 'Legend of Zelda, The - ')
+        .replace(/^the legend of zelda\b[:\s-]*/i, 'Legend of Zelda, The - ')
+        .replace(/\s+-\s+/g, ' - ')
+        .trim();
+
+      variants.add(expanded);
+      variants.add(base.replace(/:\s*/g, ' - '));
+      variants.add(expanded.replace(/:\s*/g, ' - '));
+
+      return Array.from(variants).filter(Boolean);
+    }
+
+    function buildCoverCandidates(rom) {
+      const candidates = [];
+      const code = (rom.gameCode || '').trim().toUpperCase();
+
+      // 1. Direct 4-letter Game ID lookup on GameTDB for NDS cartridges (e.g., YGXE -> GTA Chinatown Wars)
+      if (rom.system === 'NDS' && /^[A-Z0-9]{4}$/.test(code) && code !== 'NTR0') {
+        candidates.push(`https://art.gametdb.com/ds/coverM/US/${code}.jpg`);
+        candidates.push(`https://art.gametdb.com/ds/coverM/EN/${code}.jpg`);
+        candidates.push(`https://art.gametdb.com/ds/cover/US/${code}.png`);
+        candidates.push(`https://art.gametdb.com/ds/cover/EN/${code}.png`);
+      }
+
+      // 2. Libretro Thumbnails CDN with expanded titles & multi-language No-Intro suffixes
+      const repo = rom.system === 'NDS'
         ? 'https://thumbnails.libretro.com/Nintendo%20-%20Nintendo%20DS'
         : 'https://thumbnails.libretro.com/Nintendo%20-%20Game%20Boy%20Advance';
 
-      const stem = sanitizeLibretroName(fileName.replace(/\.(gba|nds|zip)$/i, ''));
-      const clean = sanitizeLibretroName(cleanTitle);
+      const stem = sanitizeLibretroName((rom.fileName || rom.title).replace(/\.(gba|nds|zip)$/i, ''));
+      candidates.push(`${repo}/Named_Boxarts/${encodeURIComponent(stem)}.png`);
 
-      const candidates = [
-        `${repo}/Named_Boxarts/${encodeURIComponent(stem)}.png`,
-        `${repo}/Named_Boxarts/${encodeURIComponent(clean + ' (USA)')}.png`,
-        `${repo}/Named_Boxarts/${encodeURIComponent(clean + ' (USA, Europe)')}.png`,
-        `${repo}/Named_Boxarts/${encodeURIComponent(clean + ' (Europe)')}.png`,
-        `${repo}/Named_Titles/${encodeURIComponent(stem)}.png`,
-        `${repo}/Named_Titles/${encodeURIComponent(clean + ' (USA)')}.png`
+      const suffixes = [
+        ' (USA)',
+        ' (USA) (En,Fr,De,Es,It)',
+        ' (USA) (En,Fr,Es)',
+        ' (Europe)',
+        ' (Europe) (En,Fr,De,Es,It)',
+        ' (USA, Europe)',
+        ' (World)',
+        ' (Japan)'
       ];
 
+      const titleVariants = expandTitleVariants(rom.fileName || rom.title);
+      for (const variant of titleVariants) {
+        const clean = sanitizeLibretroName(variant);
+        for (const suffix of suffixes) {
+          candidates.push(`${repo}/Named_Boxarts/${encodeURIComponent(clean + suffix)}.png`);
+        }
+      }
+
+      candidates.push(`${repo}/Named_Titles/${encodeURIComponent(stem)}.png`);
       return Array.from(new Set(candidates));
     }
 
@@ -1049,6 +1092,7 @@
 
       const cleanTitle = fileName
         .replace(/\.(gba|nds|zip)$/i, '')
+        .replace(/^\d{3,4}\s*-\s*/, '')
         .replace(/\[.*?\]|\(.*?\)/g, '')
         .replace(/[_-]+/g, ' ')
         .trim() || internalTitle || 'Untitled ROM';
@@ -1091,7 +1135,7 @@
       const hex = getActiveAccentHex();
       document.documentElement.style.setProperty('--accent', hex);
       document.documentElement.style.setProperty('--accent-soft', hexToRgba(hex, 0.18));
-      document.documentElement.style.setProperty('--accent-text', state.darkMode ? hex : hex);
+      document.documentElement.style.setProperty('--accent-text', hex);
       syncSnowEngine();
     }
 
@@ -1216,7 +1260,6 @@
 
       const grid = document.getElementById('rom-grid');
 
-      // Add ROM tile
       const addTile = document.createElement('button');
       addTile.className = 'add-tile glass';
       addTile.innerHTML = `
@@ -1259,18 +1302,19 @@
           </div>
         `;
 
-        // Progressive Cover Art Loader (Custom Upload -> Libretro Boxart CDN -> Title Screen -> Fallback)
+        const coverBox = card.querySelector('.rom-cover');
         const coverImg = card.querySelector('.rom-cover-img');
-        const fallbackTitle = card.querySelector('.fallback-title');
+        const fallbackInfo = card.querySelector('.rom-fallback-info');
 
         if (rom.customCover) {
           coverImg.src = rom.customCover;
           coverImg.onload = () => {
             coverImg.classList.add('loaded');
-            fallbackTitle.style.display = 'none';
+            coverBox.classList.add('has-art');
+            fallbackInfo.style.display = 'none';
           };
         } else {
-          const candidates = buildCoverCandidates(rom.system, rom.fileName || rom.title, rom.title);
+          const candidates = buildCoverCandidates(rom);
           let idx = 0;
           const tryNext = () => {
             if (idx >= candidates.length) return;
@@ -1278,7 +1322,8 @@
           };
           coverImg.onload = () => {
             coverImg.classList.add('loaded');
-            fallbackTitle.style.display = 'none';
+            coverBox.classList.add('has-art');
+            fallbackInfo.style.display = 'none';
           };
           coverImg.onerror = tryNext;
           tryNext();
@@ -1803,7 +1848,6 @@
       if (state.user) importRomFiles(e.dataTransfer.files);
     });
 
-    // Hydrate IndexedDB on load (zero pre-added demo ROMs or bots)
     (async function init() {
       applyTheme();
       try {
