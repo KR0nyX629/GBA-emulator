@@ -750,7 +750,7 @@
       NDS: { Up: 'ArrowUp', Down: 'ArrowDown', Left: 'ArrowLeft', Right: 'ArrowRight', A: 'KeyX', B: 'KeyZ', X: 'KeyD', Y: 'KeyC', L: 'KeyA', R: 'KeyS', Start: 'Enter', Select: 'ShiftRight', Touch: 'Mouse / Tap' }
     };
 
-    const PREFS_KEY = 'gba_launcher_prefs_v4';
+    const PREFS_KEY = 'gba_launcher_prefs_v5';
 
     function loadSavedPrefs() {
       try {
@@ -787,8 +787,7 @@
       screenOverride: 'auto',
       activeBlobUrl: null,
       sessionStart: 0,
-      coverTargetRomId: null,
-      focusObserver: null
+      coverTargetRomId: null
     };
 
     function savePrefs() {
@@ -1542,7 +1541,7 @@
     }
 
     // ========================================================================
-    // 6. PRE-PLAY CONTROLS POPUP, KEYBOARD FOCUS & WASM EMULATOR LAUNCHER
+    // 6. PRE-PLAY CONTROLS POPUP & WASM EMULATOR LAUNCHER
     // ========================================================================
     function focusGameCanvas() {
       if (!state.activeRom) return;
@@ -1553,9 +1552,7 @@
         return;
       }
       const gameEl = document.getElementById('game');
-      if (gameEl) {
-        gameEl.focus({ preventScroll: true });
-      }
+      if (gameEl) gameEl.focus({ preventScroll: true });
     }
 
     function openPrePlayModal(rom) {
@@ -1639,25 +1636,8 @@
 
       applyViewportAspect();
 
-      if (state.focusObserver) {
-        state.focusObserver.disconnect();
-        state.focusObserver = null;
-      }
-
       const mount = document.getElementById('ejs-mount');
       mount.innerHTML = '<div id="game" tabindex="0"></div>';
-      const gameEl = document.getElementById('game');
-      focusGameCanvas();
-
-      // Watch for EmulatorJS injecting its <canvas> so it receives keyboard focus immediately
-      state.focusObserver = new MutationObserver(() => {
-        const canvas = gameEl.querySelector('canvas');
-        if (canvas) {
-          focusGameCanvas();
-        }
-      });
-      state.focusObserver.observe(gameEl, { childList: true, subtree: true });
-
       const oldLoader = document.getElementById('ejs-loader-script');
       if (oldLoader) oldLoader.remove();
 
@@ -1677,24 +1657,8 @@
         ? rom.fileName
         : `${rom.title.replace(/[^a-z0-9]/gi, '_')}.${rom.system.toLowerCase()}`;
 
-      // Map user's custom keybinds into EmulatorJS Player 1 controls
-      const binds = state.keybinds[rom.system] || DEFAULT_KEYBINDS[rom.system];
-      window.EJS_defaultControls = {
-        0: {
-          0:  { value: binds.B || 'KeyZ',           value2: 'BUTTON_2' },
-          1:  { value: binds.Y || 'KeyC',           value2: 'BUTTON_4' },
-          2:  { value: binds.Select || 'ShiftRight', value2: 'SELECT' },
-          3:  { value: binds.Start || 'Enter',      value2: 'START' },
-          4:  { value: binds.Up || 'ArrowUp',       value2: 'DPAD_UP' },
-          5:  { value: binds.Down || 'ArrowDown',   value2: 'DPAD_DOWN' },
-          6:  { value: binds.Left || 'ArrowLeft',   value2: 'DPAD_LEFT' },
-          7:  { value: binds.Right || 'ArrowRight', value2: 'DPAD_RIGHT' },
-          8:  { value: binds.A || 'KeyX',           value2: 'BUTTON_1' },
-          9:  { value: binds.X || 'KeyD',           value2: 'BUTTON_3' },
-          10: { value: binds.L || 'KeyA',           value2: 'LEFT_TOP_SHOULDER' },
-          11: { value: binds.R || 'KeyS',           value2: 'RIGHT_TOP_SHOULDER' }
-        }
-      };
+      // Clean up any stale global override from previous sessions
+      delete window.EJS_defaultControls;
 
       window.EJS_player = '#game';
       window.EJS_core = core;
@@ -1708,7 +1672,7 @@
       window.EJS_onGameStart = () => {
         document.getElementById('player-status').textContent = `${core.toUpperCase()} Running`;
         focusGameCanvas();
-        setTimeout(focusGameCanvas, 120);
+        setTimeout(focusGameCanvas, 150);
       };
 
       const script = document.createElement('script');
@@ -1716,7 +1680,6 @@
       script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
       script.onload = () => {
         document.getElementById('player-status').textContent = 'Core Loaded · Starting...';
-        focusGameCanvas();
       };
       script.onerror = () => {
         document.getElementById('player-status').textContent = 'Error: Could not reach EmulatorJS CDN';
@@ -1726,10 +1689,6 @@
 
     async function closeGame() {
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-      if (state.focusObserver) {
-        state.focusObserver.disconnect();
-        state.focusObserver = null;
-      }
       if (state.activeRom && state.sessionStart) {
         const mins = Math.max(1, Math.round((Date.now() - state.sessionStart) / 60000));
         state.activeRom.playMinutes = (state.activeRom.playMinutes || 0) + mins;
@@ -1862,7 +1821,7 @@
     };
     document.getElementById('close-game-btn').onclick = closeGame;
 
-    // Re-focus emulator canvas when clicking inside the game stage
+    // Focus the emulator canvas whenever clicking inside the game viewport
     document.getElementById('game-stage-wrap').addEventListener('pointerdown', () => {
       setTimeout(focusGameCanvas, 0);
     });
@@ -1910,16 +1869,9 @@
         return;
       }
 
-      // Keep arrow/space keys from scrolling or triggering focused topbar buttons during gameplay
-      if (state.activeRom) {
-        const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'];
-        if (navKeys.includes(e.code)) {
-          e.preventDefault();
-        }
-        if (document.activeElement && document.activeElement.tagName === 'BUTTON') {
-          document.activeElement.blur();
-          focusGameCanvas();
-        }
+      if (state.activeRom && document.activeElement && document.activeElement.tagName === 'BUTTON') {
+        document.activeElement.blur();
+        focusGameCanvas();
       }
     });
 
