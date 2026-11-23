@@ -636,7 +636,7 @@
             <div class="brand-badge" style="width:36px;height:36px;font-size:13px;">GBA</div>
             <div>
               <div style="font-weight:700;font-size:14px;">GBA Launcher</div>
-              <div style="font-size:11px;color:var(--muted);">DeSmuME 2015 + mGBA</div>
+              <div style="font-size:11px;color:var(--muted);">GBA + NDS WASM</div>
             </div>
           </div>
 
@@ -720,7 +720,7 @@
       <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
         <div>
           <div style="font-size:12px;font-weight:700;">⚡ 60 FPS Performance Mode</div>
-          <div style="font-size:11px;color:var(--muted);">DeSmuME 2015 JIT + auto frame-skip</div>
+          <div style="font-size:11px;color:var(--muted);">Low-latency frame pacing + zero rewind overhead</div>
         </div>
         <input type="checkbox" id="modal-perf-checkbox" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;" />
       </div>
@@ -797,7 +797,7 @@
       NDS: { Up: 'ArrowUp', Down: 'ArrowDown', Left: 'ArrowLeft', Right: 'ArrowRight', A: 'KeyX', B: 'KeyZ', X: 'KeyD', Y: 'KeyC', L: 'KeyA', R: 'KeyS', Start: 'Enter', Select: 'ShiftRight', Touch: 'Mouse / Tap' }
     };
 
-    const PREFS_KEY = 'gba_launcher_prefs_v6';
+    const PREFS_KEY = 'gba_launcher_prefs_v7';
 
     function loadSavedPrefs() {
       try {
@@ -819,6 +819,12 @@
     const saved = loadSavedPrefs();
     const initialRoom = getUrlRoomParam() || saved.roomCode || 'GBA-LOUNGE';
 
+    // Ensure only verified EmulatorJS CDN cores are used
+    const VALID_NDS_CORES = ['nds', 'melonds', 'desmume'];
+    const VALID_GBA_CORES = ['gba', 'vba_next'];
+    const restoredNdsCore = VALID_NDS_CORES.includes(saved.ndsCore) ? saved.ndsCore : 'nds';
+    const restoredGbaCore = VALID_GBA_CORES.includes(saved.gbaCore) ? saved.gbaCore : 'gba';
+
     const state = {
       user: saved.user || null,
       darkMode: saved.darkMode !== undefined ? saved.darkMode : true,
@@ -828,8 +834,8 @@
       snow: saved.snow !== undefined ? saved.snow : true,
       perfMode: saved.perfMode !== undefined ? saved.perfMode : true,
       skipPopup: Boolean(saved.skipPopup),
-      gbaCore: saved.gbaCore || 'gba',
-      ndsCore: saved.ndsCore || 'desmume2015',
+      gbaCore: restoredGbaCore,
+      ndsCore: restoredNdsCore,
       keybinds: saved.keybinds || JSON.parse(JSON.stringify(DEFAULT_KEYBINDS)),
       roomCode: initialRoom,
       chat: Array.isArray(saved.chat) ? saved.chat.slice(-80) : [],
@@ -888,8 +894,8 @@
       peer: null,
       isHost: false,
       hostConn: null,
-      guestConns: new Map(), // peerId -> DataConnection
-      members: new Map(),    // clientId -> { clientId, name, playing, isHost }
+      guestConns: new Map(),
+      members: new Map(),
       reconnectTimer: null,
       bc: null,
       statusText: 'Offline'
@@ -982,148 +988,154 @@
         return;
       }
 
-      setNetStatus('Connecting...');
-      const hostPeerId = `gbal-v6-room-${cleanCode.toLowerCase()}`;
+      try {
+        setNetStatus('Connecting...');
+        const hostPeerId = `gbal-v7-room-${cleanCode.toLowerCase()}`;
 
-      // Step 1: Create an ephemeral guest peer and try connecting to the room host
-      const guestPeer = new Peer({ debug: 0 });
-      net.peer = guestPeer;
+        const guestPeer = new Peer({ debug: 0 });
+        net.peer = guestPeer;
 
-      guestPeer.on('open', () => {
-        if (net.peer !== guestPeer) return;
-        const conn = guestPeer.connect(hostPeerId, { reliable: true });
-        net.hostConn = conn;
-
-        const handshakeTimeout = setTimeout(() => {
-          if (!conn.open && net.peer === guestPeer) {
-            try { conn.close(); } catch {}
-            claimHostRole(hostPeerId);
-          }
-        }, 2800);
-
-        conn.on('open', () => {
-          clearTimeout(handshakeTimeout);
-          net.isHost = false;
-          setNetStatus('Live P2P');
-          conn.send({ type: 'hello', member: getMyPresence() });
-        });
-
-        conn.on('data', (data) => {
-          if (!data || typeof data !== 'object') return;
-          if (data.type === 'members' && Array.isArray(data.list)) {
-            net.members.clear();
-            for (const m of data.list) net.members.set(m.clientId, m);
-            net.members.set(net.clientId, getMyPresence());
-            renderSocial();
-          } else if (data.type === 'history' && Array.isArray(data.messages)) {
-            for (const m of data.messages) pushChatMessage(m, false);
-            savePrefs();
-          } else if (data.type === 'chat' && data.message) {
-            pushChatMessage(data.message, true);
-          }
-        });
-
-        conn.on('close', () => {
+        guestPeer.on('open', () => {
           if (net.peer !== guestPeer) return;
-          setNetStatus('Reconnecting...');
-          net.reconnectTimer = setTimeout(() => {
-            connectToLiveRoom(state.roomCode);
-          }, 500 + Math.random() * 900);
+          const conn = guestPeer.connect(hostPeerId, { reliable: true });
+          net.hostConn = conn;
+
+          const handshakeTimeout = setTimeout(() => {
+            if (!conn.open && net.peer === guestPeer) {
+              try { conn.close(); } catch {}
+              claimHostRole(hostPeerId);
+            }
+          }, 2800);
+
+          conn.on('open', () => {
+            clearTimeout(handshakeTimeout);
+            net.isHost = false;
+            setNetStatus('Live P2P');
+            conn.send({ type: 'hello', member: getMyPresence() });
+          });
+
+          conn.on('data', (data) => {
+            if (!data || typeof data !== 'object') return;
+            if (data.type === 'members' && Array.isArray(data.list)) {
+              net.members.clear();
+              for (const m of data.list) net.members.set(m.clientId, m);
+              net.members.set(net.clientId, getMyPresence());
+              renderSocial();
+            } else if (data.type === 'history' && Array.isArray(data.messages)) {
+              for (const m of data.messages) pushChatMessage(m, false);
+              savePrefs();
+            } else if (data.type === 'chat' && data.message) {
+              pushChatMessage(data.message, true);
+            }
+          });
+
+          conn.on('close', () => {
+            if (net.peer !== guestPeer) return;
+            setNetStatus('Reconnecting...');
+            net.reconnectTimer = setTimeout(() => {
+              connectToLiveRoom(state.roomCode);
+            }, 500 + Math.random() * 900);
+          });
+
+          conn.on('error', () => {
+            clearTimeout(handshakeTimeout);
+            if (net.peer === guestPeer) claimHostRole(hostPeerId);
+          });
         });
 
-        conn.on('error', () => {
-          clearTimeout(handshakeTimeout);
-          if (net.peer === guestPeer) claimHostRole(hostPeerId);
+        guestPeer.on('error', (err) => {
+          if (net.peer !== guestPeer) return;
+          if (err && err.type === 'peer-unavailable') {
+            claimHostRole(hostPeerId);
+          } else {
+            setNetStatus('Local Tab');
+          }
         });
-      });
-
-      guestPeer.on('error', (err) => {
-        if (net.peer !== guestPeer) return;
-        if (err && err.type === 'peer-unavailable') {
-          claimHostRole(hostPeerId);
-        } else {
-          setNetStatus('Local Tab');
-        }
-      });
+      } catch {
+        setNetStatus('Local Tab');
+      }
     }
 
     function claimHostRole(hostPeerId) {
       destroyNetwork();
       if (!state.user || typeof window.Peer === 'undefined') return;
 
-      const hostPeer = new Peer(hostPeerId, { debug: 0 });
-      net.peer = hostPeer;
+      try {
+        const hostPeer = new Peer(hostPeerId, { debug: 0 });
+        net.peer = hostPeer;
 
-      hostPeer.on('open', () => {
-        if (net.peer !== hostPeer) return;
-        net.isHost = true;
-        net.members.set(net.clientId, getMyPresence());
-        setNetStatus('Live Host');
-        renderSocial();
-      });
-
-      hostPeer.on('connection', (conn) => {
-        let remoteClientId = null;
-
-        conn.on('open', () => {
-          net.guestConns.set(conn.peer, conn);
-          conn.send({ type: 'history', messages: state.chat.slice(-40) });
+        hostPeer.on('open', () => {
+          if (net.peer !== hostPeer) return;
+          net.isHost = true;
+          net.members.set(net.clientId, getMyPresence());
+          setNetStatus('Live Host');
+          renderSocial();
         });
 
-        conn.on('data', (data) => {
-          if (!data || typeof data !== 'object') return;
-          if (data.type === 'hello' && data.member) {
-            remoteClientId = data.member.clientId;
-            const isNewJoin = !net.members.has(remoteClientId);
-            net.members.set(remoteClientId, { ...data.member, isHost: false });
-            broadcastMembersFromHost();
-            if (isNewJoin) {
+        hostPeer.on('connection', (conn) => {
+          let remoteClientId = null;
+
+          conn.on('open', () => {
+            net.guestConns.set(conn.peer, conn);
+            conn.send({ type: 'history', messages: state.chat.slice(-40) });
+          });
+
+          conn.on('data', (data) => {
+            if (!data || typeof data !== 'object') return;
+            if (data.type === 'hello' && data.member) {
+              remoteClientId = data.member.clientId;
+              const isNewJoin = !net.members.has(remoteClientId);
+              net.members.set(remoteClientId, { ...data.member, isHost: false });
+              broadcastMembersFromHost();
+              if (isNewJoin) {
+                const sysMsg = {
+                  id: 'sys-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+                  system: true,
+                  text: `${data.member.name} joined room ${state.roomCode}`,
+                  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+                pushChatMessage(sysMsg, true);
+                relayFromHost({ type: 'chat', message: sysMsg });
+              }
+            } else if (data.type === 'presence' && data.member) {
+              remoteClientId = data.member.clientId;
+              net.members.set(remoteClientId, { ...data.member, isHost: false });
+              broadcastMembersFromHost();
+            } else if (data.type === 'chat' && data.message) {
+              pushChatMessage(data.message, true);
+              relayFromHost({ type: 'chat', message: data.message }, conn.peer);
+            }
+          });
+
+          conn.on('close', () => {
+            net.guestConns.delete(conn.peer);
+            if (remoteClientId && net.members.has(remoteClientId)) {
+              const left = net.members.get(remoteClientId);
+              net.members.delete(remoteClientId);
+              broadcastMembersFromHost();
               const sysMsg = {
                 id: 'sys-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
                 system: true,
-                text: `${data.member.name} joined room ${state.roomCode}`,
+                text: `${left.name} left the room`,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               };
               pushChatMessage(sysMsg, true);
               relayFromHost({ type: 'chat', message: sysMsg });
             }
-          } else if (data.type === 'presence' && data.member) {
-            remoteClientId = data.member.clientId;
-            net.members.set(remoteClientId, { ...data.member, isHost: false });
-            broadcastMembersFromHost();
-          } else if (data.type === 'chat' && data.message) {
-            pushChatMessage(data.message, true);
-            relayFromHost({ type: 'chat', message: data.message }, conn.peer);
-          }
+          });
         });
 
-        conn.on('close', () => {
-          net.guestConns.delete(conn.peer);
-          if (remoteClientId && net.members.has(remoteClientId)) {
-            const left = net.members.get(remoteClientId);
-            net.members.delete(remoteClientId);
-            broadcastMembersFromHost();
-            const sysMsg = {
-              id: 'sys-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-              system: true,
-              text: `${left.name} left the room`,
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            };
-            pushChatMessage(sysMsg, true);
-            relayFromHost({ type: 'chat', message: sysMsg });
+        hostPeer.on('error', (err) => {
+          if (net.peer !== hostPeer) return;
+          if (err && err.type === 'unavailable-id') {
+            net.reconnectTimer = setTimeout(() => connectToLiveRoom(state.roomCode), 350);
+          } else {
+            setNetStatus('Local Tab');
           }
         });
-      });
-
-      hostPeer.on('error', (err) => {
-        if (net.peer !== hostPeer) return;
-        // Another tab claimed the host ID just ahead of us — rejoin as guest
-        if (err && err.type === 'unavailable-id') {
-          net.reconnectTimer = setTimeout(() => connectToLiveRoom(state.roomCode), 350);
-        } else {
-          setNetStatus('Local Tab');
-        }
-      });
+      } catch {
+        setNetStatus('Local Tab');
+      }
     }
 
     function sendPresenceUpdate() {
@@ -1164,7 +1176,7 @@
     }
 
     if ('BroadcastChannel' in window) {
-      net.bc = new BroadcastChannel('gba_launcher_live_chat_v6');
+      net.bc = new BroadcastChannel('gba_launcher_live_chat_v7');
       net.bc.onmessage = (ev) => {
         const data = ev.data;
         if (!data || data.room !== state.roomCode) return;
@@ -1620,7 +1632,7 @@
           <div>
             <h1 style="font-size:20px;font-weight:700;">Your Library</h1>
             <p style="font-size:12px;color:var(--muted);margin-top:3px;">
-              GBA (3:2) · NDS DeSmuME 2015 (2:3) · ${state.perfMode ? '⚡ 60 FPS Performance Mode Active' : 'Native Accuracy Mode'}
+              GBA (3:2) · NDS (2:3) · ${state.perfMode ? '⚡ 60 FPS Performance Mode Active' : 'Standard Quality Mode'}
             </p>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
@@ -1636,7 +1648,6 @@
 
       document.getElementById('lib-perf-toggle').onclick = () => {
         state.perfMode = !state.perfMode;
-        if (state.perfMode && state.ndsCore === 'melonds') state.ndsCore = 'desmume2015';
         savePrefs();
         syncPerfLabels();
         renderMain();
@@ -1759,7 +1770,7 @@
       container.innerHTML = `
         <div style="max-width:720px;">
           <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">Leaderboard &amp; Room Activity</h1>
-          <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Tracked playtime across GBA &amp; DeSmuME 2015 sessions.</p>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Tracked playtime across GBA &amp; NDS sessions.</p>
           <div class="panel glass" style="padding:0;overflow:hidden;">
             ${rows.map((r, i) => `
               <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);${r.isYou ? 'background:var(--accent-soft);' : ''}">
@@ -1782,7 +1793,7 @@
       container.innerHTML = `
         <div style="max-width:860px;">
           <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">Customise &amp; Cores</h1>
-          <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Configure 60 FPS DeSmuME performance mode, accent colours, snowflakes, and keybinds.</p>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Configure 60 FPS performance mode, accent colours, snowflakes, cores, and keybinds.</p>
 
           <div class="panel glass">
             <h3 style="font-size:14px;font-weight:700;margin-bottom:14px;">Appearance, Snowflakes &amp; Layout</h3>
@@ -1831,11 +1842,10 @@
             </div>
             <div class="grid-2">
               <div>
-                <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;">NDS Core (DeSmuME 2015 Fastest for 60 FPS)</label>
+                <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;">NDS Core (Dual-Screen 2:3)</label>
                 <select id="nds-core-select" class="input" style="margin-bottom:10px;">
-                  <option value="desmume2015" ${state.ndsCore === 'desmume2015' ? 'selected' : ''}>DeSmuME 2015 (60 FPS Performance Core · No BIOS)</option>
-                  <option value="desmume" ${state.ndsCore === 'desmume' ? 'selected' : ''}>DeSmuME Standard (High Compatibility · No BIOS)</option>
-                  <option value="melonds" ${state.ndsCore === 'melonds' ? 'selected' : ''}>melonDS (Requires BIOS/Firmware)</option>
+                  <option value="nds" ${state.ndsCore === 'nds' ? 'selected' : ''}>EmulatorJS NDS Default (Recommended · Works Without BIOS)</option>
+                  <option value="desmume" ${state.ndsCore === 'desmume' ? 'selected' : ''}>DeSmuME (Alternative NDS Core)</option>
                 </select>
                 <button id="upload-nds-bios" class="btn-ghost" style="width:100%;justify-content:space-between;">
                   <span>${state.bios.nds ? 'BIOS: ' + escapeHtml(state.bios.nds.fileName) : 'Optional: Attach NDS BIOS/Firmware'}</span>
@@ -1891,7 +1901,6 @@
       document.getElementById('set-snow-off').onclick = () => { state.snow = false; savePrefs(); renderApp(); };
       document.getElementById('set-perf-toggle').onclick = () => {
         state.perfMode = !state.perfMode;
-        if (state.perfMode && state.ndsCore === 'melonds') state.ndsCore = 'desmume2015';
         savePrefs();
         renderApp();
       };
@@ -2098,13 +2107,16 @@
       }
 
       const buf = state.buffers[rom.id];
+      if (!buf) {
+        document.getElementById('player-status').textContent = 'Error: ROM buffer missing. Re-import ROM.';
+        return;
+      }
+
       const blob = new Blob([buf], { type: 'application/octet-stream' });
       const blobUrl = URL.createObjectURL(blob);
       state.activeBlobUrl = blobUrl;
 
-      // Choose DeSmuME 2015 when 60 FPS Performance Mode is active on NDS
-      const chosenNdsCore = state.perfMode ? 'desmume2015' : (state.ndsCore || 'desmume2015');
-      const core = rom.system === 'NDS' ? chosenNdsCore : state.gbaCore;
+      const core = rom.system === 'NDS' ? (state.ndsCore || 'nds') : (state.gbaCore || 'gba');
       const biosObj = rom.system === 'NDS' ? state.bios.nds : state.bios.gba;
       const safeName = /\.(gba|nds)$/i.test(rom.fileName || '')
         ? rom.fileName
@@ -2122,18 +2134,12 @@
       window.EJS_biosUrl = biosObj ? biosObj.url : '';
       window.EJS_defaultOptions = {
         'save-state-location': 'browser',
-        ...(rom.system === 'NDS' ? {
-          desmume_cpu_mode: 'jit',
-          desmume_jit_block_size: state.perfMode ? '32' : '12',
-          desmume_internal_resolution: '256x192',
-          desmume_frameskip: state.perfMode ? '1' : '0',
-          desmume_num_cores: '2',
-          desmume_gfx_edgemark: state.perfMode ? 'disabled' : 'enabled',
-          desmume_gfx_linehack: state.perfMode ? 'disabled' : 'enabled'
-        } : {})
+        'vsync': state.perfMode ? 'disabled' : 'enabled',
+        'video-smooth': state.perfMode ? 'disabled' : 'enabled',
+        'rewind-enabled': state.perfMode ? 'disabled' : 'enabled'
       };
       window.EJS_onGameStart = () => {
-        document.getElementById('player-status').textContent = `${core.toUpperCase()} · ${state.perfMode ? '60 FPS Mode' : 'Native'}`;
+        document.getElementById('player-status').textContent = `${core.toUpperCase()} · ${state.perfMode ? '60 FPS Mode' : 'Quality'}`;
         focusGameCanvas();
         setTimeout(focusGameCanvas, 150);
       };
@@ -2200,7 +2206,6 @@
     document.querySelectorAll('.perf-toggle-btn').forEach((btn) => {
       btn.onclick = () => {
         state.perfMode = !state.perfMode;
-        if (state.perfMode && state.ndsCore === 'melonds') state.ndsCore = 'desmume2015';
         savePrefs();
         syncPerfLabels();
         renderMain();
