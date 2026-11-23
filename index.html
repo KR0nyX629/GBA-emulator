@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GBA Launcher</title>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <style>
     :root {
       --bg: #08080b;
@@ -155,6 +156,12 @@
       transition: border-color 0.15s, background 0.15s;
     }
     .btn-ghost:hover { border-color: var(--accent); }
+    .btn-ghost.active-toggle {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent-text);
+      font-weight: 600;
+    }
 
     /* Main App Shell */
     .app-shell {
@@ -370,9 +377,9 @@
     .mini-action:hover { color: var(--accent-text); }
     .mini-action.danger:hover { color: #fb7185; }
 
-    /* Social Drawer */
+    /* Live Chat & Room Drawer */
     .social-drawer {
-      width: 280px;
+      width: 295px;
       border-left: 1px solid var(--border);
       border-top: none;
       border-bottom: none;
@@ -382,14 +389,14 @@
       flex-shrink: 0;
     }
     .drawer-sec {
-      padding: 14px 16px;
+      padding: 12px 15px;
       border-bottom: 1px solid var(--border);
     }
     .friend-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 0;
+      padding: 5px 0;
       font-size: 12px;
     }
     .dot {
@@ -397,16 +404,32 @@
       height: 8px;
       border-radius: 50%;
       display: inline-block;
-      margin-right: 8px;
+      margin-right: 7px;
     }
     .chat-feed {
       flex: 1;
       overflow-y: auto;
-      padding: 14px 16px;
+      padding: 12px 15px;
       display: flex;
       flex-direction: column;
       gap: 10px;
       font-size: 12px;
+    }
+    .chat-msg {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 10px;
+    }
+    .chat-msg.self {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .chat-sys {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      padding: 2px 0;
     }
     .chat-form {
       padding: 12px;
@@ -571,18 +594,18 @@
 
       <form id="auth-form">
         <div class="field">
-          <label>Display Name</label>
+          <label>Display Name (shown in Chat)</label>
           <input id="auth-name" class="input" type="text" placeholder="e.g. RetroRunner" />
         </div>
         <div class="field">
-          <label>Email (Optional)</label>
-          <input id="auth-email" class="input" type="email" placeholder="player@domain.com" />
+          <label>Chat Room Code (Optional)</label>
+          <input id="auth-room" class="input" type="text" placeholder="GBA-LOUNGE" />
         </div>
         <button type="submit" class="btn-primary">Sign In to Launcher</button>
       </form>
 
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);">
-        <span>Local Browser Storage</span>
+        <span>60 FPS WASM + Live P2P Chat</span>
         <button id="guest-btn" type="button" style="color:var(--accent-text);font-weight:600;">Continue as Guest →</button>
       </div>
     </div>
@@ -599,6 +622,7 @@
         <div id="topbar-tabs" style="display:flex;gap:6px;"></div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn-ghost perf-toggle-btn" title="Toggle 60 FPS Performance Mode">⚡ 60 FPS: On</button>
         <button class="btn-ghost snow-toggle-btn" title="Toggle Snowflakes">❄ Snow: On</button>
         <button class="btn-primary add-rom-trigger" style="width:auto;padding:7px 14px;">+ Add ROM</button>
         <button id="topbar-logout" class="btn-ghost">Exit</button>
@@ -612,7 +636,7 @@
             <div class="brand-badge" style="width:36px;height:36px;font-size:13px;">GBA</div>
             <div>
               <div style="font-weight:700;font-size:14px;">GBA Launcher</div>
-              <div style="font-size:11px;color:var(--muted);">GBA + NDS WASM</div>
+              <div style="font-size:11px;color:var(--muted);">DeSmuME 2015 + mGBA</div>
             </div>
           </div>
 
@@ -621,13 +645,18 @@
           <nav id="sidebar-tabs" class="nav-list"></nav>
         </div>
 
-        <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn-ghost perf-toggle-btn" style="width:100%;justify-content:space-between;">
+            <span>⚡ 60 FPS Mode</span>
+            <span class="perf-status-label" style="color:var(--accent-text);font-weight:700;">On</span>
+          </button>
+
           <button class="btn-ghost snow-toggle-btn" style="width:100%;justify-content:space-between;">
-            <span>Snowflakes</span>
+            <span>❄ Snowflakes</span>
             <span class="snow-status-label" style="color:var(--accent-text);font-weight:700;">On</span>
           </button>
 
-          <div style="padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:12px;">
+          <div style="padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:12px;">
             <div style="min-width:0;">
               <div id="user-display-name" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Player</div>
               <div id="rom-count-label" style="font-size:11px;color:var(--muted);">0 ROMs</div>
@@ -641,27 +670,35 @@
         <div id="main-content" class="container"></div>
       </main>
 
+      <!-- LIVE P2P MULTI-USER CHAT & ROOM PRESENCE DRAWER -->
       <aside class="social-drawer glass">
         <div class="drawer-sec" style="display:flex;align-items:center;justify-content:space-between;">
-          <span style="font-weight:700;font-size:13px;">Friends</span>
-          <span id="friends-count-badge" style="font-size:11px;color:var(--muted);">0 online</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-weight:700;font-size:13px;">Live Room</span>
+            <span id="p2p-status-pill" style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:var(--accent-soft);color:var(--accent-text);">Connecting...</span>
+          </div>
+          <button id="copy-invite-btn" class="btn-ghost" style="padding:4px 8px;font-size:11px;" title="Copy room invite link">Copy Invite</button>
         </div>
 
         <div class="drawer-sec">
-          <form id="add-friend-form" style="display:flex;gap:6px;margin-bottom:10px;">
-            <input id="friend-name-input" class="input" style="padding:7px 10px;font-size:12px;" placeholder="Add friend tag..." />
-            <button type="submit" class="btn-ghost" style="padding:7px 10px;">Add</button>
+          <form id="join-room-form" style="display:flex;gap:6px;margin-bottom:10px;">
+            <input id="room-code-input" class="input" style="padding:7px 10px;font-size:12px;text-transform:uppercase;font-family:monospace;" placeholder="Room code..." />
+            <button type="submit" class="btn-ghost" style="padding:7px 10px;">Join</button>
           </form>
-          <div id="friends-list"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:11px;font-weight:700;color:var(--muted);">PLAYERS IN ROOM</span>
+            <span id="room-online-count" style="font-size:11px;color:var(--muted);">1 online</span>
+          </div>
+          <div id="room-members-list"></div>
         </div>
 
-        <div style="padding:10px 16px 4px;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Lounge Chat</span>
+        <div style="padding:8px 15px 4px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Live Chat</span>
           <button id="clear-chat-btn" style="font-size:11px;color:var(--muted);">Clear</button>
         </div>
         <div id="chat-feed" class="chat-feed"></div>
         <form id="chat-form" class="chat-form">
-          <input id="chat-input" class="input" style="padding:8px 10px;font-size:12px;" placeholder="Write a note or message..." />
+          <input id="chat-input" class="input" style="padding:8px 10px;font-size:12px;" placeholder="Message room..." autocomplete="off" />
           <button type="submit" class="btn-primary" style="width:auto;padding:8px 12px;">Send</button>
         </form>
       </aside>
@@ -678,6 +715,14 @@
           <h3 id="modal-game-title" style="font-size:18px;font-weight:700;margin-top:8px;">Game Title</h3>
         </div>
         <button id="modal-close-btn" class="btn-ghost" style="padding:5px 9px;">✕</button>
+      </div>
+
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:12px;font-weight:700;">⚡ 60 FPS Performance Mode</div>
+          <div style="font-size:11px;color:var(--muted);">DeSmuME 2015 JIT + auto frame-skip</div>
+        </div>
+        <input type="checkbox" id="modal-perf-checkbox" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;" />
       </div>
 
       <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:16px;">
@@ -704,9 +749,11 @@
         <span id="player-sys-badge" style="background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:3px 7px;border-radius:6px;">GBA</span>
         <span id="player-game-title" style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Game</span>
         <span id="player-status" style="font-size:11px;color:#a1a1aa;font-family:monospace;">Loading Core...</span>
+        <span id="fps-meter" style="font-size:11px;font-weight:700;font-family:monospace;padding:2px 7px;border-radius:6px;background:rgba(16,185,129,0.16);color:#34d399;">-- FPS</span>
       </div>
 
       <div style="display:flex;align-items:center;gap:8px;">
+        <button id="player-perf-btn" class="btn-ghost" style="background:#18181d;border-color:#27272a;color:#f4f4f5;" title="Toggle 60 FPS Performance Mode">⚡ 60 FPS: On</button>
         <div id="screen-mode-pills" class="pill-group" style="background:#121216;border:1px solid #27272a;"></div>
         <button id="fullscreen-btn" class="btn-ghost" style="background:#18181d;border-color:#27272a;color:#f4f4f5;">Fullscreen</button>
         <button id="close-game-btn" class="btn-ghost" style="background:rgba(244,63,94,0.16);border-color:rgba(244,63,94,0.3);color:#fb7185;">✕ Close</button>
@@ -750,7 +797,7 @@
       NDS: { Up: 'ArrowUp', Down: 'ArrowDown', Left: 'ArrowLeft', Right: 'ArrowRight', A: 'KeyX', B: 'KeyZ', X: 'KeyD', Y: 'KeyC', L: 'KeyA', R: 'KeyS', Start: 'Enter', Select: 'ShiftRight', Touch: 'Mouse / Tap' }
     };
 
-    const PREFS_KEY = 'gba_launcher_prefs_v5';
+    const PREFS_KEY = 'gba_launcher_prefs_v6';
 
     function loadSavedPrefs() {
       try {
@@ -760,7 +807,17 @@
       }
     }
 
+    function getUrlRoomParam() {
+      try {
+        const p = new URLSearchParams(window.location.search).get('room');
+        return p ? p.replace(/[^a-z0-9-_]/gi, '').toUpperCase().slice(0, 20) : '';
+      } catch {
+        return '';
+      }
+    }
+
     const saved = loadSavedPrefs();
+    const initialRoom = getUrlRoomParam() || saved.roomCode || 'GBA-LOUNGE';
 
     const state = {
       user: saved.user || null,
@@ -769,12 +826,13 @@
       customHex: saved.customHex || '#6366f1',
       navLayout: saved.navLayout || 'sidebar',
       snow: saved.snow !== undefined ? saved.snow : true,
+      perfMode: saved.perfMode !== undefined ? saved.perfMode : true,
       skipPopup: Boolean(saved.skipPopup),
       gbaCore: saved.gbaCore || 'gba',
-      ndsCore: saved.ndsCore || 'nds',
+      ndsCore: saved.ndsCore || 'desmume2015',
       keybinds: saved.keybinds || JSON.parse(JSON.stringify(DEFAULT_KEYBINDS)),
-      friends: Array.isArray(saved.friends) ? saved.friends : [],
-      chat: Array.isArray(saved.chat) ? saved.chat : [],
+      roomCode: initialRoom,
+      chat: Array.isArray(saved.chat) ? saved.chat.slice(-80) : [],
       activeTab: 'library',
       systemFilter: 'ALL',
       searchQuery: '',
@@ -787,8 +845,18 @@
       screenOverride: 'auto',
       activeBlobUrl: null,
       sessionStart: 0,
-      coverTargetRomId: null
+      coverTargetRomId: null,
+      fpsRafId: null
     };
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
 
     function savePrefs() {
       try {
@@ -799,12 +867,13 @@
           customHex: state.customHex,
           navLayout: state.navLayout,
           snow: state.snow,
+          perfMode: state.perfMode,
           skipPopup: state.skipPopup,
           gbaCore: state.gbaCore,
           ndsCore: state.ndsCore,
           keybinds: state.keybinds,
-          friends: state.friends,
-          chat: state.chat
+          roomCode: state.roomCode,
+          chat: state.chat.slice(-80)
         }));
       } catch (e) {
         console.warn('Could not persist prefs:', e);
@@ -812,7 +881,304 @@
     }
 
     // ========================================================================
-    // 2. SNOWFLAKES PARTICLE ENGINE (TOGGLEABLE)
+    // 2. LIVE MULTI-USER CHAT ENGINE (WEBRTC PEERJS + MULTI-TAB BROADCAST)
+    // ========================================================================
+    const net = {
+      clientId: 'u-' + Math.random().toString(36).slice(2, 10),
+      peer: null,
+      isHost: false,
+      hostConn: null,
+      guestConns: new Map(), // peerId -> DataConnection
+      members: new Map(),    // clientId -> { clientId, name, playing, isHost }
+      reconnectTimer: null,
+      bc: null,
+      statusText: 'Offline'
+    };
+
+    function getMyPresence() {
+      return {
+        clientId: net.clientId,
+        name: state.user ? state.user.name : 'Guest',
+        playing: state.activeRom ? `${state.activeRom.system}: ${state.activeRom.title}` : 'In Library',
+        isHost: net.isHost
+      };
+    }
+
+    function setNetStatus(text) {
+      net.statusText = text;
+      const pill = document.getElementById('p2p-status-pill');
+      if (pill) pill.textContent = text;
+    }
+
+    function pushChatMessage(msg, shouldSave = true) {
+      if (msg.id && state.chat.some((m) => m.id === msg.id)) return;
+      state.chat.push(msg);
+      if (state.chat.length > 100) state.chat = state.chat.slice(-100);
+      if (shouldSave) savePrefs();
+      renderSocial();
+    }
+
+    function broadcastMembersFromHost() {
+      if (!net.isHost) return;
+      net.members.set(net.clientId, getMyPresence());
+      const list = Array.from(net.members.values());
+      const packet = { type: 'members', list };
+      for (const conn of net.guestConns.values()) {
+        if (conn.open) conn.send(packet);
+      }
+      renderSocial();
+    }
+
+    function relayFromHost(packet, excludePeerId = null) {
+      if (!net.isHost) return;
+      for (const [peerId, conn] of net.guestConns.entries()) {
+        if (peerId !== excludePeerId && conn.open) {
+          conn.send(packet);
+        }
+      }
+    }
+
+    function destroyNetwork() {
+      if (net.reconnectTimer) {
+        clearTimeout(net.reconnectTimer);
+        net.reconnectTimer = null;
+      }
+      if (net.hostConn) {
+        try { net.hostConn.close(); } catch {}
+        net.hostConn = null;
+      }
+      for (const conn of net.guestConns.values()) {
+        try { conn.close(); } catch {}
+      }
+      net.guestConns.clear();
+      net.members.clear();
+      net.isHost = false;
+      if (net.peer) {
+        try { net.peer.destroy(); } catch {}
+        net.peer = null;
+      }
+    }
+
+    function connectToLiveRoom(rawCode) {
+      const cleanCode = (rawCode || 'GBA-LOUNGE')
+        .replace(/[^a-z0-9-_]/gi, '')
+        .toUpperCase()
+        .slice(0, 20) || 'GBA-LOUNGE';
+
+      state.roomCode = cleanCode;
+      savePrefs();
+
+      const roomInput = document.getElementById('room-code-input');
+      if (roomInput) roomInput.value = cleanCode;
+
+      destroyNetwork();
+      if (!state.user) return;
+
+      net.members.set(net.clientId, getMyPresence());
+      renderSocial();
+
+      if (typeof window.Peer === 'undefined') {
+        setNetStatus('Local Tab');
+        return;
+      }
+
+      setNetStatus('Connecting...');
+      const hostPeerId = `gbal-v6-room-${cleanCode.toLowerCase()}`;
+
+      // Step 1: Create an ephemeral guest peer and try connecting to the room host
+      const guestPeer = new Peer({ debug: 0 });
+      net.peer = guestPeer;
+
+      guestPeer.on('open', () => {
+        if (net.peer !== guestPeer) return;
+        const conn = guestPeer.connect(hostPeerId, { reliable: true });
+        net.hostConn = conn;
+
+        const handshakeTimeout = setTimeout(() => {
+          if (!conn.open && net.peer === guestPeer) {
+            try { conn.close(); } catch {}
+            claimHostRole(hostPeerId);
+          }
+        }, 2800);
+
+        conn.on('open', () => {
+          clearTimeout(handshakeTimeout);
+          net.isHost = false;
+          setNetStatus('Live P2P');
+          conn.send({ type: 'hello', member: getMyPresence() });
+        });
+
+        conn.on('data', (data) => {
+          if (!data || typeof data !== 'object') return;
+          if (data.type === 'members' && Array.isArray(data.list)) {
+            net.members.clear();
+            for (const m of data.list) net.members.set(m.clientId, m);
+            net.members.set(net.clientId, getMyPresence());
+            renderSocial();
+          } else if (data.type === 'history' && Array.isArray(data.messages)) {
+            for (const m of data.messages) pushChatMessage(m, false);
+            savePrefs();
+          } else if (data.type === 'chat' && data.message) {
+            pushChatMessage(data.message, true);
+          }
+        });
+
+        conn.on('close', () => {
+          if (net.peer !== guestPeer) return;
+          setNetStatus('Reconnecting...');
+          net.reconnectTimer = setTimeout(() => {
+            connectToLiveRoom(state.roomCode);
+          }, 500 + Math.random() * 900);
+        });
+
+        conn.on('error', () => {
+          clearTimeout(handshakeTimeout);
+          if (net.peer === guestPeer) claimHostRole(hostPeerId);
+        });
+      });
+
+      guestPeer.on('error', (err) => {
+        if (net.peer !== guestPeer) return;
+        if (err && err.type === 'peer-unavailable') {
+          claimHostRole(hostPeerId);
+        } else {
+          setNetStatus('Local Tab');
+        }
+      });
+    }
+
+    function claimHostRole(hostPeerId) {
+      destroyNetwork();
+      if (!state.user || typeof window.Peer === 'undefined') return;
+
+      const hostPeer = new Peer(hostPeerId, { debug: 0 });
+      net.peer = hostPeer;
+
+      hostPeer.on('open', () => {
+        if (net.peer !== hostPeer) return;
+        net.isHost = true;
+        net.members.set(net.clientId, getMyPresence());
+        setNetStatus('Live Host');
+        renderSocial();
+      });
+
+      hostPeer.on('connection', (conn) => {
+        let remoteClientId = null;
+
+        conn.on('open', () => {
+          net.guestConns.set(conn.peer, conn);
+          conn.send({ type: 'history', messages: state.chat.slice(-40) });
+        });
+
+        conn.on('data', (data) => {
+          if (!data || typeof data !== 'object') return;
+          if (data.type === 'hello' && data.member) {
+            remoteClientId = data.member.clientId;
+            const isNewJoin = !net.members.has(remoteClientId);
+            net.members.set(remoteClientId, { ...data.member, isHost: false });
+            broadcastMembersFromHost();
+            if (isNewJoin) {
+              const sysMsg = {
+                id: 'sys-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+                system: true,
+                text: `${data.member.name} joined room ${state.roomCode}`,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              };
+              pushChatMessage(sysMsg, true);
+              relayFromHost({ type: 'chat', message: sysMsg });
+            }
+          } else if (data.type === 'presence' && data.member) {
+            remoteClientId = data.member.clientId;
+            net.members.set(remoteClientId, { ...data.member, isHost: false });
+            broadcastMembersFromHost();
+          } else if (data.type === 'chat' && data.message) {
+            pushChatMessage(data.message, true);
+            relayFromHost({ type: 'chat', message: data.message }, conn.peer);
+          }
+        });
+
+        conn.on('close', () => {
+          net.guestConns.delete(conn.peer);
+          if (remoteClientId && net.members.has(remoteClientId)) {
+            const left = net.members.get(remoteClientId);
+            net.members.delete(remoteClientId);
+            broadcastMembersFromHost();
+            const sysMsg = {
+              id: 'sys-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+              system: true,
+              text: `${left.name} left the room`,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            pushChatMessage(sysMsg, true);
+            relayFromHost({ type: 'chat', message: sysMsg });
+          }
+        });
+      });
+
+      hostPeer.on('error', (err) => {
+        if (net.peer !== hostPeer) return;
+        // Another tab claimed the host ID just ahead of us — rejoin as guest
+        if (err && err.type === 'unavailable-id') {
+          net.reconnectTimer = setTimeout(() => connectToLiveRoom(state.roomCode), 350);
+        } else {
+          setNetStatus('Local Tab');
+        }
+      });
+    }
+
+    function sendPresenceUpdate() {
+      const me = getMyPresence();
+      net.members.set(net.clientId, me);
+      if (net.isHost) {
+        broadcastMembersFromHost();
+      } else if (net.hostConn && net.hostConn.open) {
+        net.hostConn.send({ type: 'presence', member: me });
+      }
+      if (net.bc) {
+        net.bc.postMessage({ type: 'presence', room: state.roomCode, member: me });
+      }
+      renderSocial();
+    }
+
+    function sendChatMessage(text) {
+      const clean = text.trim();
+      if (!clean || !state.user) return;
+      const message = {
+        id: `${net.clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        senderId: net.clientId,
+        sender: state.user.name,
+        text: clean,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      pushChatMessage(message, true);
+
+      if (net.isHost) {
+        relayFromHost({ type: 'chat', message });
+      } else if (net.hostConn && net.hostConn.open) {
+        net.hostConn.send({ type: 'chat', message });
+      }
+      if (net.bc) {
+        net.bc.postMessage({ type: 'chat', room: state.roomCode, message });
+      }
+    }
+
+    if ('BroadcastChannel' in window) {
+      net.bc = new BroadcastChannel('gba_launcher_live_chat_v6');
+      net.bc.onmessage = (ev) => {
+        const data = ev.data;
+        if (!data || data.room !== state.roomCode) return;
+        if (data.type === 'chat' && data.message) {
+          pushChatMessage(data.message, true);
+        } else if (data.type === 'presence' && data.member) {
+          net.members.set(data.member.clientId, data.member);
+          renderSocial();
+        }
+      };
+    }
+
+    // ========================================================================
+    // 3. SNOWFLAKES PARTICLE ENGINE (TOGGLEABLE)
     // ========================================================================
     let snowAnimId = null;
     let snowflakes = [];
@@ -903,7 +1269,7 @@
     });
 
     // ========================================================================
-    // 3. INDEXEDDB STORAGE (ROMS, CUSTOM COVER ART & BIOS)
+    // 4. INDEXEDDB STORAGE (ROMS, CUSTOM COVER ART & BIOS)
     // ========================================================================
     function openDB() {
       return new Promise((resolve, reject) => {
@@ -949,7 +1315,7 @@
     }
 
     // ========================================================================
-    // 4. ROM HEADER PARSER, NDS ICON EXTRACTOR & SMART BOXART RESOLVER
+    // 5. ROM HEADER PARSER, NDS ICON EXTRACTOR & SMART BOXART RESOLVER
     // ========================================================================
     function readAscii(bytes, start, len) {
       let s = '';
@@ -1114,7 +1480,7 @@
     }
 
     // ========================================================================
-    // 5. THEME & UI RENDERERS
+    // 6. THEME, PERFORMANCE SYNC & UI RENDERERS
     // ========================================================================
     function getActiveAccentHex() {
       if (state.accent === 'custom') return state.customHex || '#6366f1';
@@ -1131,6 +1497,23 @@
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
 
+    function syncPerfLabels() {
+      document.querySelectorAll('.perf-toggle-btn').forEach((btn) => {
+        btn.classList.toggle('active-toggle', state.perfMode);
+        if (btn.querySelector('.perf-status-label')) {
+          btn.querySelector('.perf-status-label').textContent = state.perfMode ? 'On' : 'Off';
+        } else {
+          btn.textContent = `⚡ 60 FPS: ${state.perfMode ? 'On' : 'Off'}`;
+        }
+      });
+      const playerPerfBtn = document.getElementById('player-perf-btn');
+      if (playerPerfBtn) {
+        playerPerfBtn.textContent = `⚡ 60 FPS: ${state.perfMode ? 'On' : 'Off'}`;
+        playerPerfBtn.style.borderColor = state.perfMode ? 'var(--accent)' : '#27272a';
+        playerPerfBtn.style.color = state.perfMode ? 'var(--accent-text)' : '#a1a1aa';
+      }
+    }
+
     function applyTheme() {
       document.body.classList.toggle('light', !state.darkMode);
       const hex = getActiveAccentHex();
@@ -1138,6 +1521,7 @@
       document.documentElement.style.setProperty('--accent-soft', hexToRgba(hex, 0.18));
       document.documentElement.style.setProperty('--accent-text', hex);
       syncSnowEngine();
+      syncPerfLabels();
     }
 
     function renderNavigation() {
@@ -1176,47 +1560,49 @@
     }
 
     function renderSocial() {
-      const fl = document.getElementById('friends-list');
-      const onlineCount = state.friends.filter((f) => f.status === 'online').length;
-      document.getElementById('friends-count-badge').textContent = `${onlineCount} online`;
+      const members = Array.from(net.members.values());
+      const countBadge = document.getElementById('room-online-count');
+      if (countBadge) countBadge.textContent = `${members.length} online`;
 
-      if (state.friends.length === 0) {
-        fl.innerHTML = `<div style="font-size:12px;color:var(--muted);padding:4px 0;">No friends added yet.</div>`;
-      } else {
-        fl.innerHTML = state.friends.map((f, idx) => `
-          <div class="friend-row">
-            <div style="min-width:0;overflow:hidden;">
-              <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                <span class="dot" style="background:#34d399;"></span>${f.name}
+      const ml = document.getElementById('room-members-list');
+      if (ml) {
+        ml.innerHTML = members.map((m) => {
+          const isMe = m.clientId === net.clientId;
+          return `
+            <div class="friend-row">
+              <div style="min-width:0;overflow:hidden;">
+                <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                  <span class="dot" style="background:#34d399;"></span>${escapeHtml(m.name)}
+                  ${isMe ? '<span style="font-size:10px;color:var(--accent-text);margin-left:4px;">(you)</span>' : ''}
+                  ${m.isHost ? '<span style="font-size:10px;color:#fbbf24;margin-left:4px;">HOST</span>' : ''}
+                </div>
+                <div style="font-size:11px;color:var(--muted);padding-left:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(m.playing || 'In Library')}</div>
               </div>
-              <div style="font-size:11px;color:var(--muted);padding-left:16px;">${f.statusText || 'Online'}</div>
             </div>
-            <button class="remove-friend-btn mini-action danger" data-idx="${idx}" title="Remove">✕</button>
-          </div>
-        `).join('');
-
-        fl.querySelectorAll('.remove-friend-btn').forEach((btn) => {
-          btn.onclick = () => {
-            state.friends.splice(Number(btn.dataset.idx), 1);
-            savePrefs();
-            renderSocial();
-          };
-        });
+          `;
+        }).join('');
       }
 
       const cf = document.getElementById('chat-feed');
+      if (!cf) return;
       if (state.chat.length === 0) {
-        cf.innerHTML = `<div style="font-size:12px;color:var(--muted);">No messages yet.</div>`;
+        cf.innerHTML = `<div class="chat-sys">Room <b>${escapeHtml(state.roomCode)}</b> ready. Share the invite link or send a message!</div>`;
       } else {
-        cf.innerHTML = state.chat.map((m) => `
-          <div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
-              <span style="font-weight:700;color:var(--accent-text);">${m.sender}</span>
-              <span style="font-size:10px;color:var(--muted);">${m.time}</span>
+        cf.innerHTML = state.chat.map((m) => {
+          if (m.system) {
+            return `<div class="chat-sys">${escapeHtml(m.text)} · ${escapeHtml(m.time || '')}</div>`;
+          }
+          const isSelf = m.senderId === net.clientId || (state.user && m.sender === state.user.name);
+          return `
+            <div class="chat-msg ${isSelf ? 'self' : ''}">
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                <span style="font-weight:700;color:var(--accent-text);">${escapeHtml(m.sender)}</span>
+                <span style="font-size:10px;color:var(--muted);">${escapeHtml(m.time || '')}</span>
+              </div>
+              <div style="line-height:1.4;word-break:break-word;">${escapeHtml(m.text)}</div>
             </div>
-            <div style="line-height:1.4;">${m.text}</div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
         cf.scrollTop = cf.scrollHeight;
       }
     }
@@ -1234,18 +1620,27 @@
           <div>
             <h1 style="font-size:20px;font-weight:700;">Your Library</h1>
             <p style="font-size:12px;color:var(--muted);margin-top:3px;">
-              GBA opens in Single-Screen (3:2) · NDS opens in Dual-Screen (2:3)
+              GBA (3:2) · NDS DeSmuME 2015 (2:3) · ${state.perfMode ? '⚡ 60 FPS Performance Mode Active' : 'Native Accuracy Mode'}
             </p>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+            <button id="lib-perf-toggle" class="btn-ghost ${state.perfMode ? 'active-toggle' : ''}">⚡ 60 FPS: ${state.perfMode ? 'On' : 'Off'}</button>
             <div class="pill-group glass" id="sys-pills">
               ${['ALL', 'GBA', 'NDS'].map((s) => `<button class="pill ${state.systemFilter === s ? 'active' : ''}" data-sys="${s}">${s}</button>`).join('')}
             </div>
-            <input id="rom-search" class="input" style="width:200px;padding:7px 12px;" placeholder="Search ROMs..." value="${state.searchQuery}" />
+            <input id="rom-search" class="input" style="width:190px;padding:7px 12px;" placeholder="Search ROMs..." value="${escapeHtml(state.searchQuery)}" />
           </div>
         </div>
         <div class="rom-grid" id="rom-grid"></div>
       `;
+
+      document.getElementById('lib-perf-toggle').onclick = () => {
+        state.perfMode = !state.perfMode;
+        if (state.perfMode && state.ndsCore === 'melonds') state.ndsCore = 'desmume2015';
+        savePrefs();
+        syncPerfLabels();
+        renderMain();
+      };
 
       container.querySelectorAll('#sys-pills .pill').forEach((btn) => {
         btn.onclick = () => { state.systemFilter = btn.dataset.sys; renderMain(); };
@@ -1279,7 +1674,7 @@
 
         card.innerHTML = `
           <div class="rom-cover" style="background:linear-gradient(135deg, ${rom.palette[0]}, ${rom.palette[1]});">
-            <img class="rom-cover-img" alt="${rom.title} cover" />
+            <img class="rom-cover-img" alt="${escapeHtml(rom.title)} cover" />
             <div class="rom-cover-scrim"></div>
             <div class="rom-badges">
               <span class="badge-dark">${rom.system}</span>
@@ -1287,13 +1682,13 @@
             </div>
             <div class="rom-fallback-info">
               ${rom.ndsIcon ? `<img src="${rom.ndsIcon}" class="nds-icon-preview" alt="" />` : ''}
-              <div style="font-family:monospace;font-size:10px;opacity:0.85;">${rom.gameCode}</div>
-              <div class="fallback-title" style="font-weight:700;font-size:14px;line-height:1.25;margin-top:2px;">${rom.title}</div>
+              <div style="font-family:monospace;font-size:10px;opacity:0.85;">${escapeHtml(rom.gameCode)}</div>
+              <div class="fallback-title" style="font-weight:700;font-size:14px;line-height:1.25;margin-top:2px;">${escapeHtml(rom.title)}</div>
             </div>
           </div>
           <div class="rom-meta">
             <div>
-              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${rom.title}</div>
+              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(rom.title)}</div>
               <div style="font-size:11px;color:var(--muted);margin-top:2px;">${mb} · ${rom.playMinutes || 0}m</div>
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid var(--border);">
@@ -1352,23 +1747,27 @@
 
     function renderLeaderboard(container) {
       const myMins = state.roms.reduce((sum, r) => sum + (r.playMinutes || 0), 0);
+      const others = Array.from(net.members.values())
+        .filter((m) => m.clientId !== net.clientId)
+        .map((m) => ({ name: m.name, roms: 'Live', mins: 0, isYou: false, status: m.playing }));
+
       const rows = [
-        { name: state.user.name, roms: state.roms.length, mins: myMins, isYou: true },
-        ...state.friends.map((f) => ({ name: f.name, roms: 0, mins: f.mins || 0, isYou: false }))
-      ].sort((a, b) => b.mins - a.mins);
+        { name: state.user.name, roms: `${state.roms.length} ROMs`, mins: myMins, isYou: true, status: 'Active' },
+        ...others
+      ];
 
       container.innerHTML = `
         <div style="max-width:720px;">
-          <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">Leaderboard</h1>
-          <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Your tracked playtime across GBA &amp; NDS sessions.</p>
+          <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">Leaderboard &amp; Room Activity</h1>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Tracked playtime across GBA &amp; DeSmuME 2015 sessions.</p>
           <div class="panel glass" style="padding:0;overflow:hidden;">
             ${rows.map((r, i) => `
               <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);${r.isYou ? 'background:var(--accent-soft);' : ''}">
                 <div style="display:flex;align-items:center;gap:14px;">
                   <span style="font-weight:700;font-size:13px;width:28px;color:${i === 0 ? '#fbbf24' : 'var(--muted)'};">#${i + 1}</span>
                   <div>
-                    <div style="font-weight:600;font-size:14px;">${r.name} ${r.isYou ? '<span style="background:var(--accent);color:#fff;font-size:10px;padding:2px 6px;border-radius:5px;margin-left:6px;">YOU</span>' : ''}</div>
-                    <div style="font-size:11px;color:var(--muted);">${r.roms} ROMs in library</div>
+                    <div style="font-weight:600;font-size:14px;">${escapeHtml(r.name)} ${r.isYou ? '<span style="background:var(--accent);color:#fff;font-size:10px;padding:2px 6px;border-radius:5px;margin-left:6px;">YOU</span>' : ''}</div>
+                    <div style="font-size:11px;color:var(--muted);">${escapeHtml(r.roms)} · ${escapeHtml(r.status)}</div>
                   </div>
                 </div>
                 <div style="font-weight:700;font-size:14px;">${Math.floor(r.mins / 60)}h ${r.mins % 60}m</div>
@@ -1383,7 +1782,7 @@
       container.innerHTML = `
         <div style="max-width:860px;">
           <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">Customise &amp; Cores</h1>
-          <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Configure accent colours, frosted blur atmosphere, snowflakes, cores, and keybinds.</p>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Configure 60 FPS DeSmuME performance mode, accent colours, snowflakes, and keybinds.</p>
 
           <div class="panel glass">
             <h3 style="font-size:14px;font-weight:700;margin-bottom:14px;">Appearance, Snowflakes &amp; Layout</h3>
@@ -1426,26 +1825,31 @@
           </div>
 
           <div class="panel glass">
-            <h3 style="font-size:14px;font-weight:700;margin-bottom:14px;">WebAssembly Cores &amp; Optional BIOS</h3>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <h3 style="font-size:14px;font-weight:700;">60 FPS Performance &amp; WebAssembly Cores</h3>
+              <button id="set-perf-toggle" class="btn-ghost ${state.perfMode ? 'active-toggle' : ''}">⚡ 60 FPS Mode: ${state.perfMode ? 'On' : 'Off'}</button>
+            </div>
             <div class="grid-2">
               <div>
-                <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;">GBA Core (Single-Screen 3:2)</label>
-                <select id="gba-core-select" class="input" style="margin-bottom:10px;">
-                  <option value="gba" ${state.gbaCore === 'gba' ? 'selected' : ''}>mGBA (Recommended)</option>
-                  <option value="vba_next" ${state.gbaCore === 'vba_next' ? 'selected' : ''}>VBA-Next</option>
+                <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;">NDS Core (DeSmuME 2015 Fastest for 60 FPS)</label>
+                <select id="nds-core-select" class="input" style="margin-bottom:10px;">
+                  <option value="desmume2015" ${state.ndsCore === 'desmume2015' ? 'selected' : ''}>DeSmuME 2015 (60 FPS Performance Core · No BIOS)</option>
+                  <option value="desmume" ${state.ndsCore === 'desmume' ? 'selected' : ''}>DeSmuME Standard (High Compatibility · No BIOS)</option>
+                  <option value="melonds" ${state.ndsCore === 'melonds' ? 'selected' : ''}>melonDS (Requires BIOS/Firmware)</option>
                 </select>
-                <button id="upload-gba-bios" class="btn-ghost" style="width:100%;justify-content:space-between;">
-                  <span>${state.bios.gba ? 'BIOS: ' + state.bios.gba.fileName : 'Optional: Attach gba_bios.bin'}</span>
+                <button id="upload-nds-bios" class="btn-ghost" style="width:100%;justify-content:space-between;">
+                  <span>${state.bios.nds ? 'BIOS: ' + escapeHtml(state.bios.nds.fileName) : 'Optional: Attach NDS BIOS/Firmware'}</span>
                   <span style="color:var(--accent-text);">Browse</span>
                 </button>
               </div>
               <div>
-                <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;">NDS Core (Dual-Screen 2:3)</label>
-                <select id="nds-core-select" class="input" style="margin-bottom:10px;">
-                  <option value="nds" ${state.ndsCore === 'nds' ? 'selected' : ''}>melonDS / DeSmuME (Dual-Screen + Touch)</option>
+                <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;">GBA Core (Single-Screen 3:2)</label>
+                <select id="gba-core-select" class="input" style="margin-bottom:10px;">
+                  <option value="gba" ${state.gbaCore === 'gba' ? 'selected' : ''}>mGBA (60 FPS Recommended)</option>
+                  <option value="vba_next" ${state.gbaCore === 'vba_next' ? 'selected' : ''}>VBA-Next</option>
                 </select>
-                <button id="upload-nds-bios" class="btn-ghost" style="width:100%;justify-content:space-between;">
-                  <span>${state.bios.nds ? 'BIOS: ' + state.bios.nds.fileName : 'Optional: Attach NDS BIOS/Firmware'}</span>
+                <button id="upload-gba-bios" class="btn-ghost" style="width:100%;justify-content:space-between;">
+                  <span>${state.bios.gba ? 'BIOS: ' + escapeHtml(state.bios.gba.fileName) : 'Optional: Attach gba_bios.bin'}</span>
                   <span style="color:var(--accent-text);">Browse</span>
                 </button>
               </div>
@@ -1485,6 +1889,12 @@
       document.getElementById('set-topbar').onclick = () => { state.navLayout = 'topbar'; savePrefs(); renderApp(); };
       document.getElementById('set-snow-on').onclick = () => { state.snow = true; savePrefs(); renderApp(); };
       document.getElementById('set-snow-off').onclick = () => { state.snow = false; savePrefs(); renderApp(); };
+      document.getElementById('set-perf-toggle').onclick = () => {
+        state.perfMode = !state.perfMode;
+        if (state.perfMode && state.ndsCore === 'melonds') state.ndsCore = 'desmume2015';
+        savePrefs();
+        renderApp();
+      };
 
       container.querySelectorAll('.accent-dot').forEach((btn) => {
         btn.onclick = () => { state.accent = btn.dataset.key; savePrefs(); renderApp(); };
@@ -1530,18 +1940,24 @@
       if (!state.user) {
         authView.classList.remove('hidden');
         launcherView.classList.add('hidden');
+        document.getElementById('auth-room').value = state.roomCode;
         return;
       }
 
       authView.classList.add('hidden');
       launcherView.classList.remove('hidden');
+      document.getElementById('room-code-input').value = state.roomCode;
       renderNavigation();
       renderSocial();
       renderMain();
+
+      if (!net.peer) {
+        connectToLiveRoom(state.roomCode);
+      }
     }
 
     // ========================================================================
-    // 6. PRE-PLAY CONTROLS POPUP & WASM EMULATOR LAUNCHER
+    // 7. PRE-PLAY CONTROLS POPUP, LIVE FPS METER & WASM EMULATOR LAUNCHER
     // ========================================================================
     function focusGameCanvas() {
       if (!state.activeRom) return;
@@ -1555,6 +1971,36 @@
       if (gameEl) gameEl.focus({ preventScroll: true });
     }
 
+    function startFpsMeter() {
+      stopFpsMeter();
+      let frames = 0;
+      let last = performance.now();
+      const el = document.getElementById('fps-meter');
+
+      function tick(now) {
+        if (!state.activeRom) return;
+        frames++;
+        if (now - last >= 500) {
+          const fps = Math.min(60, Math.round((frames * 1000) / (now - last)));
+          if (el) {
+            el.textContent = `${fps} FPS`;
+            el.style.color = fps >= 50 ? '#34d399' : (fps >= 35 ? '#fbbf24' : '#fb7185');
+          }
+          frames = 0;
+          last = now;
+        }
+        state.fpsRafId = requestAnimationFrame(tick);
+      }
+      state.fpsRafId = requestAnimationFrame(tick);
+    }
+
+    function stopFpsMeter() {
+      if (state.fpsRafId) {
+        cancelAnimationFrame(state.fpsRafId);
+        state.fpsRafId = null;
+      }
+    }
+
     function openPrePlayModal(rom) {
       if (state.skipPopup) {
         launchGame(rom);
@@ -1564,6 +2010,7 @@
       document.getElementById('modal-sys-badge').textContent = rom.system;
       document.getElementById('modal-screen-label').textContent = rom.system === 'NDS' ? 'Dual-Screen (2:3)' : 'Single-Screen (3:2)';
       document.getElementById('modal-game-title').textContent = rom.title;
+      document.getElementById('modal-perf-checkbox').checked = state.perfMode;
       document.getElementById('skip-popup-checkbox').checked = state.skipPopup;
 
       const grid = document.getElementById('modal-keys-grid');
@@ -1629,12 +2076,16 @@
       state.screenOverride = 'auto';
       state.sessionStart = Date.now();
 
+      sendPresenceUpdate();
+      syncPerfLabels();
+
       document.getElementById('player-sys-badge').textContent = rom.system;
       document.getElementById('player-game-title').textContent = rom.title;
       document.getElementById('player-status').textContent = 'Booting WASM Core...';
       document.getElementById('game-overlay').classList.remove('hidden');
 
       applyViewportAspect();
+      startFpsMeter();
 
       const mount = document.getElementById('ejs-mount');
       mount.innerHTML = '<div id="game" tabindex="0"></div>';
@@ -1651,13 +2102,14 @@
       const blobUrl = URL.createObjectURL(blob);
       state.activeBlobUrl = blobUrl;
 
-      const core = rom.system === 'NDS' ? state.ndsCore : state.gbaCore;
+      // Choose DeSmuME 2015 when 60 FPS Performance Mode is active on NDS
+      const chosenNdsCore = state.perfMode ? 'desmume2015' : (state.ndsCore || 'desmume2015');
+      const core = rom.system === 'NDS' ? chosenNdsCore : state.gbaCore;
       const biosObj = rom.system === 'NDS' ? state.bios.nds : state.bios.gba;
       const safeName = /\.(gba|nds)$/i.test(rom.fileName || '')
         ? rom.fileName
         : `${rom.title.replace(/[^a-z0-9]/gi, '_')}.${rom.system.toLowerCase()}`;
 
-      // Clean up any stale global override from previous sessions
       delete window.EJS_defaultControls;
 
       window.EJS_player = '#game';
@@ -1668,9 +2120,20 @@
       window.EJS_startOnLoaded = true;
       window.EJS_color = getActiveAccentHex();
       window.EJS_biosUrl = biosObj ? biosObj.url : '';
-      window.EJS_defaultOptions = { 'save-state-location': 'browser' };
+      window.EJS_defaultOptions = {
+        'save-state-location': 'browser',
+        ...(rom.system === 'NDS' ? {
+          desmume_cpu_mode: 'jit',
+          desmume_jit_block_size: state.perfMode ? '32' : '12',
+          desmume_internal_resolution: '256x192',
+          desmume_frameskip: state.perfMode ? '1' : '0',
+          desmume_num_cores: '2',
+          desmume_gfx_edgemark: state.perfMode ? 'disabled' : 'enabled',
+          desmume_gfx_linehack: state.perfMode ? 'disabled' : 'enabled'
+        } : {})
+      };
       window.EJS_onGameStart = () => {
-        document.getElementById('player-status').textContent = `${core.toUpperCase()} Running`;
+        document.getElementById('player-status').textContent = `${core.toUpperCase()} · ${state.perfMode ? '60 FPS Mode' : 'Native'}`;
         focusGameCanvas();
         setTimeout(focusGameCanvas, 150);
       };
@@ -1688,6 +2151,7 @@
     }
 
     async function closeGame() {
+      stopFpsMeter();
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       if (state.activeRom && state.sessionStart) {
         const mins = Math.max(1, Math.round((Date.now() - state.sessionStart) / 60000));
@@ -1704,12 +2168,13 @@
         state.activeBlobUrl = null;
       }
       state.activeRom = null;
+      sendPresenceUpdate();
       document.getElementById('game-overlay').classList.add('hidden');
       renderApp();
     }
 
     // ========================================================================
-    // 7. EVENT LISTENERS & STARTUP
+    // 8. EVENT LISTENERS & STARTUP
     // ========================================================================
     async function importRomFiles(fileList) {
       const files = Array.from(fileList || []);
@@ -1732,22 +2197,45 @@
       btn.onclick = () => { state.snow = !state.snow; savePrefs(); syncSnowEngine(); if (state.activeTab === 'settings') renderMain(); };
     });
 
+    document.querySelectorAll('.perf-toggle-btn').forEach((btn) => {
+      btn.onclick = () => {
+        state.perfMode = !state.perfMode;
+        if (state.perfMode && state.ndsCore === 'melonds') state.ndsCore = 'desmume2015';
+        savePrefs();
+        syncPerfLabels();
+        renderMain();
+      };
+    });
+
+    document.getElementById('player-perf-btn').onclick = (e) => {
+      e.currentTarget.blur();
+      state.perfMode = !state.perfMode;
+      savePrefs();
+      syncPerfLabels();
+      if (state.activeRom) {
+        launchGame(state.activeRom);
+      }
+    };
+
     document.getElementById('auth-form').onsubmit = (e) => {
       e.preventDefault();
       const name = document.getElementById('auth-name').value.trim();
-      const email = document.getElementById('auth-email').value.trim();
-      state.user = { name: name || (email ? email.split('@')[0] : 'PlayerOne'), email };
+      const room = document.getElementById('auth-room').value.trim();
+      if (room) state.roomCode = room.replace(/[^a-z0-9-_]/gi, '').toUpperCase().slice(0, 20) || 'GBA-LOUNGE';
+      state.user = { name: name || 'Player_' + Math.floor(100 + Math.random() * 900) };
       savePrefs();
       renderApp();
     };
     document.getElementById('guest-btn').onclick = () => {
-      state.user = { name: 'GuestPlayer', email: '' };
+      const room = document.getElementById('auth-room').value.trim();
+      if (room) state.roomCode = room.replace(/[^a-z0-9-_]/gi, '').toUpperCase().slice(0, 20) || 'GBA-LOUNGE';
+      state.user = { name: 'Guest_' + Math.floor(100 + Math.random() * 900) };
       savePrefs();
       renderApp();
     };
 
-    document.getElementById('sidebar-logout').onclick = () => { state.user = null; savePrefs(); renderApp(); };
-    document.getElementById('topbar-logout').onclick = () => { state.user = null; savePrefs(); renderApp(); };
+    document.getElementById('sidebar-logout').onclick = () => { destroyNetwork(); state.user = null; savePrefs(); renderApp(); };
+    document.getElementById('topbar-logout').onclick = () => { destroyNetwork(); state.user = null; savePrefs(); renderApp(); };
 
     document.querySelectorAll('.add-rom-trigger').forEach((btn) => {
       btn.onclick = () => document.getElementById('rom-file-input').click();
@@ -1804,6 +2292,11 @@
       state.activeTab = 'settings';
       renderApp();
     };
+    document.getElementById('modal-perf-checkbox').onchange = (e) => {
+      state.perfMode = e.target.checked;
+      savePrefs();
+      syncPerfLabels();
+    };
     document.getElementById('skip-popup-checkbox').onchange = (e) => {
       state.skipPopup = e.target.checked;
       savePrefs();
@@ -1821,20 +2314,30 @@
     };
     document.getElementById('close-game-btn').onclick = closeGame;
 
-    // Focus the emulator canvas whenever clicking inside the game viewport
     document.getElementById('game-stage-wrap').addEventListener('pointerdown', () => {
       setTimeout(focusGameCanvas, 0);
     });
 
-    document.getElementById('add-friend-form').onsubmit = (e) => {
+    // Live Chat Room Controls
+    document.getElementById('join-room-form').onsubmit = (e) => {
       e.preventDefault();
-      const input = document.getElementById('friend-name-input');
-      const tag = input.value.trim();
-      if (!tag) return;
-      state.friends.push({ name: tag, status: 'online', statusText: 'Online', mins: 0 });
-      input.value = '';
-      savePrefs();
-      renderSocial();
+      const code = document.getElementById('room-code-input').value.trim();
+      if (!code) return;
+      state.chat = [];
+      connectToLiveRoom(code);
+    };
+
+    document.getElementById('copy-invite-btn').onclick = async (e) => {
+      const btn = e.currentTarget;
+      const url = new URL(window.location.href);
+      url.searchParams.set('room', state.roomCode);
+      try {
+        await navigator.clipboard.writeText(url.toString());
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy Invite'; }, 1800);
+      } catch {
+        prompt('Share this room URL with a friend:', url.toString());
+      }
     };
 
     document.getElementById('clear-chat-btn').onclick = () => {
@@ -1847,14 +2350,8 @@
       e.preventDefault();
       const input = document.getElementById('chat-input');
       if (!input.value.trim()) return;
-      state.chat.push({
-        sender: state.user.name,
-        text: input.value.trim(),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      });
+      sendChatMessage(input.value);
       input.value = '';
-      savePrefs();
-      renderSocial();
     };
 
     window.addEventListener('keydown', (e) => {
