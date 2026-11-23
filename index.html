@@ -526,9 +526,10 @@
       background: #000;
       position: relative;
     }
-    #ejs-mount, #game {
+    #ejs-mount, #game, desmond-player {
       width: 100%;
       height: 100%;
+      display: block;
       outline: none;
     }
 
@@ -583,7 +584,7 @@
           <div class="brand-badge">GBA</div>
           <div>
             <div style="font-weight:700;font-size:17px;">GBA Launcher</div>
-            <div style="font-size:12px;color:var(--muted);">GBA &amp; NDS Browser Runtime</div>
+            <div style="font-size:12px;color:var(--muted);">44670 DeSmuME-WASM + mGBA</div>
           </div>
         </div>
         <div style="display:flex;gap:6px;">
@@ -636,7 +637,7 @@
             <div class="brand-badge" style="width:36px;height:36px;font-size:13px;">GBA</div>
             <div>
               <div style="font-weight:700;font-size:14px;">GBA Launcher</div>
-              <div style="font-size:11px;color:var(--muted);">GBA + NDS WASM</div>
+              <div style="font-size:11px;color:var(--muted);">44670 DS + mGBA</div>
             </div>
           </div>
 
@@ -719,8 +720,8 @@
 
       <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div style="font-size:12px;font-weight:700;">⚡ 60 FPS Performance Mode</div>
-          <div style="font-size:11px;color:var(--muted);">Low-latency frame pacing + zero rewind overhead</div>
+          <div style="font-size:12px;font-weight:700;">⚡ 60 FPS Mode (44670 DeSmuME-WASM)</div>
+          <div style="font-size:11px;color:var(--muted);">Fast mobile/browser DS engine (ds.44670.org)</div>
         </div>
         <input type="checkbox" id="modal-perf-checkbox" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;" />
       </div>
@@ -794,10 +795,10 @@
 
     const DEFAULT_KEYBINDS = {
       GBA: { Up: 'ArrowUp', Down: 'ArrowDown', Left: 'ArrowLeft', Right: 'ArrowRight', A: 'KeyX', B: 'KeyZ', L: 'KeyA', R: 'KeyS', Start: 'Enter', Select: 'ShiftRight' },
-      NDS: { Up: 'ArrowUp', Down: 'ArrowDown', Left: 'ArrowLeft', Right: 'ArrowRight', A: 'KeyX', B: 'KeyZ', X: 'KeyD', Y: 'KeyC', L: 'KeyA', R: 'KeyS', Start: 'Enter', Select: 'ShiftRight', Touch: 'Mouse / Tap' }
+      NDS: { Up: 'ArrowUp', Down: 'ArrowDown', Left: 'ArrowLeft', Right: 'ArrowRight', A: 'KeyZ', B: 'KeyX', X: 'KeyS', Y: 'KeyA', L: 'KeyQ', R: 'KeyW', Start: 'Enter', Select: 'Space', Touch: 'Mouse / Tap' }
     };
 
-    const PREFS_KEY = 'gba_launcher_prefs_v7';
+    const PREFS_KEY = 'gba_launcher_prefs_v8';
 
     function loadSavedPrefs() {
       try {
@@ -819,10 +820,9 @@
     const saved = loadSavedPrefs();
     const initialRoom = getUrlRoomParam() || saved.roomCode || 'GBA-LOUNGE';
 
-    // Ensure only verified EmulatorJS CDN cores are used
-    const VALID_NDS_CORES = ['nds', 'melonds', 'desmume'];
+    const VALID_NDS_CORES = ['44670', 'desmume', 'nds'];
     const VALID_GBA_CORES = ['gba', 'vba_next'];
-    const restoredNdsCore = VALID_NDS_CORES.includes(saved.ndsCore) ? saved.ndsCore : 'nds';
+    const restoredNdsCore = VALID_NDS_CORES.includes(saved.ndsCore) ? saved.ndsCore : '44670';
     const restoredGbaCore = VALID_GBA_CORES.includes(saved.gbaCore) ? saved.gbaCore : 'gba';
 
     const state = {
@@ -848,11 +848,13 @@
       listeningBind: null,
       pendingRom: null,
       activeRom: null,
+      activeEngine: null, // 'desmond' | 'ejs'
       screenOverride: 'auto',
       activeBlobUrl: null,
       sessionStart: 0,
       coverTargetRomId: null,
-      fpsRafId: null
+      fpsRafId: null,
+      desmondLayoutTimer: null
     };
 
     function escapeHtml(str) {
@@ -990,7 +992,7 @@
 
       try {
         setNetStatus('Connecting...');
-        const hostPeerId = `gbal-v7-room-${cleanCode.toLowerCase()}`;
+        const hostPeerId = `gbal-v8-room-${cleanCode.toLowerCase()}`;
 
         const guestPeer = new Peer({ debug: 0 });
         net.peer = guestPeer;
@@ -1176,7 +1178,7 @@
     }
 
     if ('BroadcastChannel' in window) {
-      net.bc = new BroadcastChannel('gba_launcher_live_chat_v7');
+      net.bc = new BroadcastChannel('gba_launcher_live_chat_v8');
       net.bc.onmessage = (ev) => {
         const data = ev.data;
         if (!data || data.room !== state.roomCode) return;
@@ -1632,7 +1634,7 @@
           <div>
             <h1 style="font-size:20px;font-weight:700;">Your Library</h1>
             <p style="font-size:12px;color:var(--muted);margin-top:3px;">
-              GBA (3:2) · NDS (2:3) · ${state.perfMode ? '⚡ 60 FPS Performance Mode Active' : 'Standard Quality Mode'}
+              GBA (3:2) · NDS (2:3) · ${state.perfMode ? '⚡ 44670 DeSmuME-WASM 60 FPS Active' : 'Standard Accuracy Mode'}
             </p>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
@@ -1648,6 +1650,7 @@
 
       document.getElementById('lib-perf-toggle').onclick = () => {
         state.perfMode = !state.perfMode;
+        if (state.perfMode) state.ndsCore = '44670';
         savePrefs();
         syncPerfLabels();
         renderMain();
@@ -1793,7 +1796,7 @@
       container.innerHTML = `
         <div style="max-width:860px;">
           <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">Customise &amp; Cores</h1>
-          <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Configure 60 FPS performance mode, accent colours, snowflakes, cores, and keybinds.</p>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:20px;">Configure 44670 DeSmuME-WASM 60 FPS engine, accent colours, snowflakes, and keybinds.</p>
 
           <div class="panel glass">
             <h3 style="font-size:14px;font-weight:700;margin-bottom:14px;">Appearance, Snowflakes &amp; Layout</h3>
@@ -1844,8 +1847,9 @@
               <div>
                 <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;">NDS Core (Dual-Screen 2:3)</label>
                 <select id="nds-core-select" class="input" style="margin-bottom:10px;">
-                  <option value="nds" ${state.ndsCore === 'nds' ? 'selected' : ''}>EmulatorJS NDS Default (Recommended · Works Without BIOS)</option>
-                  <option value="desmume" ${state.ndsCore === 'desmume' ? 'selected' : ''}>DeSmuME (Alternative NDS Core)</option>
+                  <option value="44670" ${state.ndsCore === '44670' ? 'selected' : ''}>44670 DeSmuME-WASM (ds.44670.org · Fastest 60 FPS)</option>
+                  <option value="desmume" ${state.ndsCore === 'desmume' ? 'selected' : ''}>EmulatorJS DeSmuME Turbo (Frameskip 3 + Save States)</option>
+                  <option value="nds" ${state.ndsCore === 'nds' ? 'selected' : ''}>EmulatorJS melonDS (High Accuracy)</option>
                 </select>
                 <button id="upload-nds-bios" class="btn-ghost" style="width:100%;justify-content:space-between;">
                   <span>${state.bios.nds ? 'BIOS: ' + escapeHtml(state.bios.nds.fileName) : 'Optional: Attach NDS BIOS/Firmware'}</span>
@@ -1901,6 +1905,7 @@
       document.getElementById('set-snow-off').onclick = () => { state.snow = false; savePrefs(); renderApp(); };
       document.getElementById('set-perf-toggle').onclick = () => {
         state.perfMode = !state.perfMode;
+        if (state.perfMode) state.ndsCore = '44670';
         savePrefs();
         renderApp();
       };
@@ -1916,7 +1921,12 @@
       };
 
       document.getElementById('gba-core-select').onchange = (e) => { state.gbaCore = e.target.value; savePrefs(); };
-      document.getElementById('nds-core-select').onchange = (e) => { state.ndsCore = e.target.value; savePrefs(); };
+      document.getElementById('nds-core-select').onchange = (e) => {
+        state.ndsCore = e.target.value;
+        state.perfMode = e.target.value === '44670' || e.target.value === 'desmume';
+        savePrefs();
+        syncPerfLabels();
+      };
       document.getElementById('upload-gba-bios').onclick = () => document.getElementById('bios-gba-input').click();
       document.getElementById('upload-nds-bios').onclick = () => document.getElementById('bios-nds-input').click();
       document.getElementById('reset-keys-btn').onclick = () => {
@@ -1966,10 +1976,68 @@
     }
 
     // ========================================================================
-    // 7. PRE-PLAY CONTROLS POPUP, LIVE FPS METER & WASM EMULATOR LAUNCHER
+    // 7. 44670 DESMUME-WASM LOADER + EMULATORJS RUNNER + FPS METER
     // ========================================================================
+    let desmondScriptPromise = null;
+
+    function loadDesmondRuntime() {
+      if (customElements.get('desmond-player')) return Promise.resolve();
+      if (desmondScriptPromise) return desmondScriptPromise;
+
+      desmondScriptPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/gh/js-emulators/desmond@main/cdn/desmond.min.js';
+        script.onload = () => {
+          customElements.whenDefined('desmond-player').then(resolve).catch(reject);
+        };
+        script.onerror = () => {
+          desmondScriptPromise = null;
+          reject(new Error('Failed to load 44670 Desmond WASM runtime'));
+        };
+        document.body.appendChild(script);
+      });
+      return desmondScriptPromise;
+    }
+
+    function styleDesmondScreens(player) {
+      if (!player || !player.shadowRoot) return false;
+      const top = player.shadowRoot.querySelector('#top');
+      const bottom = player.shadowRoot.querySelector('#bottom');
+      if (!top || !bottom) return false;
+
+      const mode = state.screenOverride === 'auto' ? 'dual-stacked' : state.screenOverride;
+
+      // Clean shadowRoot container so only #top and #bottom render neatly
+      Array.from(player.shadowRoot.children).forEach((el) => {
+        if (el !== top && el !== bottom && el.tagName !== 'STYLE') {
+          el.style.display = 'none';
+        }
+      });
+
+      if (mode === 'dual-wide') {
+        top.style.cssText = 'position:absolute;top:0;left:0;width:50%;height:100%;object-fit:contain;background:#000;image-rendering:pixelated;';
+        bottom.style.cssText = 'position:absolute;top:0;left:50%;width:50%;height:100%;object-fit:contain;background:#000;image-rendering:pixelated;cursor:pointer;';
+      } else if (mode === 'single') {
+        top.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;image-rendering:pixelated;';
+        bottom.style.cssText = 'display:none;';
+      } else {
+        // Dual Stacked (2:3)
+        top.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:50%;object-fit:contain;background:#000;image-rendering:pixelated;';
+        bottom.style.cssText = 'position:absolute;top:50%;left:0;width:100%;height:50%;object-fit:contain;background:#000;image-rendering:pixelated;cursor:pointer;';
+      }
+      return true;
+    }
+
     function focusGameCanvas() {
       if (!state.activeRom) return;
+      if (state.activeEngine === 'desmond') {
+        const dp = document.querySelector('desmond-player');
+        if (dp) {
+          dp.setAttribute('tabindex', '0');
+          dp.focus({ preventScroll: true });
+        }
+        return;
+      }
       const canvas = document.querySelector('#game canvas');
       if (canvas) {
         if (!canvas.hasAttribute('tabindex')) canvas.setAttribute('tabindex', '0');
@@ -2055,6 +2123,10 @@
         vp.style.maxWidth = 'min(94vw, 980px)';
       }
 
+      if (state.activeEngine === 'desmond') {
+        styleDesmondScreens(document.querySelector('desmond-player'));
+      }
+
       const bar = document.getElementById('screen-mode-pills');
       const opts = [
         { id: 'auto', label: `Auto (${rom.system === 'NDS' ? 'Dual' : 'Single'})` },
@@ -2075,7 +2147,82 @@
       });
     }
 
-    function launchGame(rom) {
+    async function launchWithDesmond44670(rom, blobUrl) {
+      state.activeEngine = 'desmond';
+      document.getElementById('player-status').textContent = 'Loading 44670 DeSmuME-WASM...';
+
+      await loadDesmondRuntime();
+
+      const mount = document.getElementById('ejs-mount');
+      mount.innerHTML = '<desmond-player id="desmond-player" tabindex="0"></desmond-player>';
+      const player = document.getElementById('desmond-player');
+
+      player.loadURL(blobUrl, () => {
+        document.getElementById('player-status').textContent = '44670 DeSmuME-WASM · 60 FPS';
+        styleDesmondScreens(player);
+        focusGameCanvas();
+      });
+
+      if (state.desmondLayoutTimer) clearInterval(state.desmondLayoutTimer);
+      let attempts = 0;
+      state.desmondLayoutTimer = setInterval(() => {
+        attempts++;
+        if (styleDesmondScreens(player) || attempts > 30) {
+          if (attempts > 30) clearInterval(state.desmondLayoutTimer);
+        }
+      }, 200);
+    }
+
+    function launchWithEmulatorJS(rom, blobUrl, coreOverride = null) {
+      state.activeEngine = 'ejs';
+      const mount = document.getElementById('ejs-mount');
+      mount.innerHTML = '<div id="game" tabindex="0"></div>';
+
+      const core = coreOverride || (rom.system === 'NDS' ? (state.perfMode ? 'desmume' : 'nds') : (state.gbaCore || 'gba'));
+      const biosObj = rom.system === 'NDS' ? state.bios.nds : state.bios.gba;
+      const safeName = /\.(gba|nds)$/i.test(rom.fileName || '')
+        ? rom.fileName
+        : `${rom.title.replace(/[^a-z0-9]/gi, '_')}.${rom.system.toLowerCase()}`;
+
+      delete window.EJS_defaultControls;
+
+      window.EJS_player = '#game';
+      window.EJS_core = core;
+      window.EJS_gameUrl = blobUrl;
+      window.EJS_gameName = safeName;
+      window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+      window.EJS_startOnLoaded = true;
+      window.EJS_color = getActiveAccentHex();
+      window.EJS_biosUrl = biosObj ? biosObj.url : '';
+      window.EJS_defaultOptions = {
+        'save-state-location': 'browser',
+        'vsync': state.perfMode ? 'disabled' : 'enabled',
+        'video-smooth': state.perfMode ? 'disabled' : 'enabled',
+        'rewind-enabled': state.perfMode ? 'disabled' : 'enabled',
+        ...(core === 'desmume' ? {
+          desmume_frameskip: '3',
+          desmume_num_cores: '4'
+        } : {})
+      };
+      window.EJS_onGameStart = () => {
+        document.getElementById('player-status').textContent = `${core.toUpperCase()} · ${state.perfMode ? 'Turbo' : 'Standard'}`;
+        focusGameCanvas();
+        setTimeout(focusGameCanvas, 150);
+      };
+
+      const script = document.createElement('script');
+      script.id = 'ejs-loader-script';
+      script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+      script.onload = () => {
+        document.getElementById('player-status').textContent = 'Core Loaded · Starting...';
+      };
+      script.onerror = () => {
+        document.getElementById('player-status').textContent = 'Error: Could not reach EmulatorJS CDN';
+      };
+      document.body.appendChild(script);
+    }
+
+    async function launchGame(rom) {
       if (document.activeElement && typeof document.activeElement.blur === 'function') {
         document.activeElement.blur();
       }
@@ -2096,8 +2243,13 @@
       applyViewportAspect();
       startFpsMeter();
 
+      if (state.desmondLayoutTimer) {
+        clearInterval(state.desmondLayoutTimer);
+        state.desmondLayoutTimer = null;
+      }
+
       const mount = document.getElementById('ejs-mount');
-      mount.innerHTML = '<div id="game" tabindex="0"></div>';
+      mount.innerHTML = '';
       const oldLoader = document.getElementById('ejs-loader-script');
       if (oldLoader) oldLoader.remove();
 
@@ -2116,48 +2268,28 @@
       const blobUrl = URL.createObjectURL(blob);
       state.activeBlobUrl = blobUrl;
 
-      const core = rom.system === 'NDS' ? (state.ndsCore || 'nds') : (state.gbaCore || 'gba');
-      const biosObj = rom.system === 'NDS' ? state.bios.nds : state.bios.gba;
-      const safeName = /\.(gba|nds)$/i.test(rom.fileName || '')
-        ? rom.fileName
-        : `${rom.title.replace(/[^a-z0-9]/gi, '_')}.${rom.system.toLowerCase()}`;
+      // Use 44670 DeSmuME-WASM (ds.44670.org engine) for NDS in 60 FPS mode
+      const use44670 = rom.system === 'NDS' && (state.perfMode || state.ndsCore === '44670');
+      if (use44670) {
+        try {
+          await launchWithDesmond44670(rom, blobUrl);
+          return;
+        } catch (err) {
+          console.warn('44670 Desmond fallback to EmulatorJS DeSmuME Turbo:', err);
+          launchWithEmulatorJS(rom, blobUrl, 'desmume');
+          return;
+        }
+      }
 
-      delete window.EJS_defaultControls;
-
-      window.EJS_player = '#game';
-      window.EJS_core = core;
-      window.EJS_gameUrl = blobUrl;
-      window.EJS_gameName = safeName;
-      window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
-      window.EJS_startOnLoaded = true;
-      window.EJS_color = getActiveAccentHex();
-      window.EJS_biosUrl = biosObj ? biosObj.url : '';
-      window.EJS_defaultOptions = {
-        'save-state-location': 'browser',
-        'vsync': state.perfMode ? 'disabled' : 'enabled',
-        'video-smooth': state.perfMode ? 'disabled' : 'enabled',
-        'rewind-enabled': state.perfMode ? 'disabled' : 'enabled'
-      };
-      window.EJS_onGameStart = () => {
-        document.getElementById('player-status').textContent = `${core.toUpperCase()} · ${state.perfMode ? '60 FPS Mode' : 'Quality'}`;
-        focusGameCanvas();
-        setTimeout(focusGameCanvas, 150);
-      };
-
-      const script = document.createElement('script');
-      script.id = 'ejs-loader-script';
-      script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
-      script.onload = () => {
-        document.getElementById('player-status').textContent = 'Core Loaded · Starting...';
-      };
-      script.onerror = () => {
-        document.getElementById('player-status').textContent = 'Error: Could not reach EmulatorJS CDN';
-      };
-      document.body.appendChild(script);
+      launchWithEmulatorJS(rom, blobUrl);
     }
 
     async function closeGame() {
       stopFpsMeter();
+      if (state.desmondLayoutTimer) {
+        clearInterval(state.desmondLayoutTimer);
+        state.desmondLayoutTimer = null;
+      }
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       if (state.activeRom && state.sessionStart) {
         const mins = Math.max(1, Math.round((Date.now() - state.sessionStart) / 60000));
@@ -2174,13 +2306,14 @@
         state.activeBlobUrl = null;
       }
       state.activeRom = null;
+      state.activeEngine = null;
       sendPresenceUpdate();
       document.getElementById('game-overlay').classList.add('hidden');
       renderApp();
     }
 
     // ========================================================================
-    // 8. EVENT LISTENERS & STARTUP
+    // 8. EVENT LISTENERS & KEYBOARD BRIDGE
     // ========================================================================
     async function importRomFiles(fileList) {
       const files = Array.from(fileList || []);
@@ -2206,6 +2339,7 @@
     document.querySelectorAll('.perf-toggle-btn').forEach((btn) => {
       btn.onclick = () => {
         state.perfMode = !state.perfMode;
+        if (state.perfMode) state.ndsCore = '44670';
         savePrefs();
         syncPerfLabels();
         renderMain();
@@ -2215,6 +2349,7 @@
     document.getElementById('player-perf-btn').onclick = (e) => {
       e.currentTarget.blur();
       state.perfMode = !state.perfMode;
+      state.ndsCore = state.perfMode ? '44670' : 'desmume';
       savePrefs();
       syncPerfLabels();
       if (state.activeRom) {
@@ -2299,6 +2434,7 @@
     };
     document.getElementById('modal-perf-checkbox').onchange = (e) => {
       state.perfMode = e.target.checked;
+      if (state.perfMode) state.ndsCore = '44670';
       savePrefs();
       syncPerfLabels();
     };
@@ -2359,6 +2495,43 @@
       input.value = '';
     };
 
+    // Bridge user keybinds to 44670 DeSmuME-WASM native keys (z=A, x=B, a=Y, s=X, q=L, w=R, Enter=Start, Space=Select)
+    const DESMOND_NATIVE_KEYMAP = {
+      Up:     { key: 'ArrowUp',    code: 'ArrowUp',    keyCode: 38 },
+      Down:   { key: 'ArrowDown',  code: 'ArrowDown',  keyCode: 40 },
+      Left:   { key: 'ArrowLeft',  code: 'ArrowLeft',  keyCode: 37 },
+      Right:  { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
+      A:      { key: 'z',          code: 'KeyZ',       keyCode: 90 },
+      B:      { key: 'x',          code: 'KeyX',       keyCode: 88 },
+      Y:      { key: 'a',          code: 'KeyA',       keyCode: 65 },
+      X:      { key: 's',          code: 'KeyS',       keyCode: 83 },
+      L:      { key: 'q',          code: 'KeyQ',       keyCode: 81 },
+      R:      { key: 'w',          code: 'KeyW',       keyCode: 87 },
+      Start:  { key: 'Enter',      code: 'Enter',      keyCode: 13 },
+      Select: { key: ' ',          code: 'Space',      keyCode: 32 }
+    };
+
+    function forwardCustomKeyToDesmond(type, e) {
+      if (!e.isTrusted || state.activeEngine !== 'desmond') return;
+      const binds = state.keybinds.NDS || {};
+      for (const [action, boundCode] of Object.entries(binds)) {
+        if (boundCode === e.code && DESMOND_NATIVE_KEYMAP[action]) {
+          const target = DESMOND_NATIVE_KEYMAP[action];
+          if (target.code !== e.code) {
+            e.preventDefault();
+            window.dispatchEvent(new KeyboardEvent(type, {
+              key: target.key,
+              code: target.code,
+              keyCode: target.keyCode,
+              which: target.keyCode,
+              bubbles: true
+            }));
+          }
+          break;
+        }
+      }
+    }
+
     window.addEventListener('keydown', (e) => {
       if (state.listeningBind) {
         e.preventDefault();
@@ -2375,6 +2548,12 @@
         document.activeElement.blur();
         focusGameCanvas();
       }
+
+      forwardCustomKeyToDesmond('keydown', e);
+    });
+
+    window.addEventListener('keyup', (e) => {
+      forwardCustomKeyToDesmond('keyup', e);
     });
 
     window.addEventListener('dragover', (e) => {
